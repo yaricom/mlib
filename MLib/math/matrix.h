@@ -344,6 +344,31 @@ public:
     }
     
     /**
+     * Calculates standard deviation of matrix by columns.
+     *
+     * @return the row vector containing the standard deviation of the elements of each column.
+     */
+    Matrix std() {
+        
+    }
+    
+    /**
+     * Calculates matrix mean by columns
+     */
+    Matrix mean() {
+        Matrix current(1, n);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                current.A[0][j] += this->A[i][j];
+                cerr << current.A[0][j] << " | ";
+            }
+            cerr << endl;
+        }
+        current /= m;
+        return current;
+    }
+    
+    /**
      * One norm
      *
      * @return maximum column sum.
@@ -563,22 +588,6 @@ public:
             }
         }
         return *this;
-    }
-    
-    /**
-     * Calculates matrix mean by columns
-     */
-    Matrix mean() {
-        Matrix current(1, n);
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                current.A[0][j] += this->A[i][j];
-                cerr << current.A[0][j] << " | ";
-            }
-            cerr << endl;
-        }
-        current /= m;
-        return current;
     }
     
     /**
