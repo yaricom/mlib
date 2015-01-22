@@ -104,7 +104,7 @@ public:
      *
      * @return m, the number of rows.
      */
-    size_t getRowDimension() const {
+    size_t rows() const {
         return m;
     }
     
@@ -113,26 +113,8 @@ public:
      *
      * @return n, the number of columns.
      */
-    size_t getColumnDimension() const {
+    size_t cols() const {
         return n;
-    }
-    
-    /**
-     * Get a single element.
-     *
-     * @param i Row index.
-     * @param j Column index.
-     * @return A(i,j)
-     */
-    double get(const int i, const int j) const {
-        return A[i][j];
-    }
-    
-    /**
-     * Access the internal two-dimensional array.
-     */
-    VDD* getArray() {
-        return &A;
     }
     
     /**
@@ -140,7 +122,7 @@ public:
      *
      * @return Matrix elements packed in a one-dimensional array by columns.
      */
-    void getColumnPackedCopy(VD &vals) {
+    void columnPackedCopy(VD &vals) {
         vals.resize(m * n, 0);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
@@ -154,25 +136,13 @@ public:
      *
      * @return Matrix elements packed in a one-dimensional array by rows.
      */
-    void getRowPackedCopy(VD &vals) {
+    void rowPackedCopy(VD &vals) {
         vals.resize(m * n, 0);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 vals[i * n + j] = A[i][j];
             }
         }
-    }
-    
-    /**
-     * Set a single element.
-     *
-     * @param i Row index.
-     * @param j Column index.
-     * @param s A(i,j).
-     */
-    inline void set(int i, int j, double s) {
-        assert( i >= 0 && i < m && j >=0 && j < n);
-        A[i][j] = s;
     }
     
     /**
@@ -193,12 +163,12 @@ public:
      * @return A(i0:i1,j0:j1)
      */
     
-    Matrix getMatrix(int i0, int i1, int j0, int j1) {
+    Matrix subMatrix(int i0, int i1, int j0, int j1) {
         assert(i0 >= 0 && i0 < i1 && i1 < m && j0 >= 0 && j0 < j1 && j1 < n);
         Matrix X(i1 - i0 + 1, j1 - j0 + 1);
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
-                X.set(i - i0, j - j0, A[i][j]);
+                X(i - i0, j - j0) = A[i][j];
             }
         }
         return X;
@@ -212,13 +182,13 @@ public:
      * @param c Array of column indices.
      * @return A(i0:i1,c(:))
      */
-    Matrix getMatrix(const int i0, const int i1, const VI &c) {
+    Matrix subMatrix(const int i0, const int i1, const VI &c) {
         assert(i0 >= 0 && i0 < i1 && i1 < m);
         Matrix X(i1 - i0 + 1, c.size());
         for (int i = i0; i <= i1; i++) {
             for (int j = 0; j < c.size(); j++) {
                 assert(c[j] < n && c[j] >= 0);
-                X.set(i - i0, j, A[i][c[j]]);
+                X(i - i0, j) = A[i][c[j]];
             }
         }
         return X;
@@ -238,13 +208,13 @@ public:
      *                Submatrix indices
      */
     
-    Matrix getMatrix(const VI &r, const int j0, const int j1) {
+    Matrix subMatrix(const VI &r, const int j0, const int j1) {
         assert(j0 >= 0 && j0 < j1 && j1 < n);
         Matrix X(r.size(), j1 - j0 + 1);
         for (int i = 0; i < r.size(); i++) {
             assert(r[i] < m && r[i] >= 0);
             for (int j = j0; j <= j1; j++) {
-                X.set(i, j - j0, A[r[i]][j]);
+                X(i, j - j0) = A[r[i]][j];
             }
         }
         return X;
@@ -263,7 +233,7 @@ public:
         assert(i0 >= 0 && i0 < i1 && i1 < m && j0 >= 0 && j0 < j1 && j1 < n);
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
-                A[i][j] = X.get(i - i0, j - j0);
+                A[i][j] = X.A[i - i0][j - j0];
             }
         }
     }
@@ -280,7 +250,7 @@ public:
             assert(r[i] < m && r[i] >= 0);
             for (int j = 0; j < c.size(); j++) {
                 assert(c[j] < n && c[j] >= 0);
-                A[r[i]][c[j]] = X.get(i, j);
+                A[r[i]][c[j]] = X.A[i][j];
             }
         }
     }
@@ -298,7 +268,7 @@ public:
         for (int i = 0; i < r.size(); i++) {
             assert(r[i] < m && r[i] >= 0);
             for (int j = j0; j <= j1; j++) {
-                A[r[i]][j] = X.get(i, j - j0);
+                A[r[i]][j] = X.A[i][j - j0];
             }
         }
     }
@@ -323,7 +293,7 @@ public:
         for (int i = i0; i <= i1; i++) {
             for (int j = 0; j < c.size(); j++) {
                 assert(c[j] < n && c[j] >= 0);
-                A[i][c[j]] = X.get(i - i0, j);
+                A[i][c[j]] = X.A[i - i0][j];
             }
         }
     }
@@ -337,10 +307,22 @@ public:
         Matrix X(n, m);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X.set(j, i, A[i][j]);
+                X(j, i) = A[i][j];
             }
         }
         return X;
+    }
+    
+#pragma mark - Algebraic functions
+    /**
+     * Scales matrix to have all samles scaled to fit range [min, max]
+     *
+     * X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
+     * X_scaled = X_std * (max - min) + min
+     */
+    //
+    inline void scaleMinMax(double min, double max) {
+#warning Implement this!
     }
     
     /**
@@ -348,21 +330,33 @@ public:
      *
      * @return the row vector containing the standard deviation of the elements of each column.
      */
-    Matrix std() {
+    Matrix std() const {
+        Matrix mean = this->mean();
+        Matrix X(1, n);
+        double diff;
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                diff = this->A[i][j] - mean.A[0][j];
+                X.A[0][j] += diff * diff;
+            }
+        }
         
+        for (int j = 0; j < n; j++) {
+            X.A[0][j] = sqrt(X.A[0][j] / (m - 1));
+        }
+        return X;
     }
+    
     
     /**
      * Calculates matrix mean by columns
      */
-    Matrix mean() {
+    Matrix mean() const {
         Matrix current(1, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 current.A[0][j] += this->A[i][j];
-                cerr << current.A[0][j] << " | ";
             }
-            cerr << endl;
         }
         current /= m;
         return current;
@@ -373,7 +367,7 @@ public:
      *
      * @return maximum column sum.
      */
-    double norm1() {
+    double norm1() const {
         double f = 0;
         for (int j = 0; j < n; j++) {
             double s = 0;
@@ -390,7 +384,7 @@ public:
      *
      * @return maximum row sum.
      */
-    double normInf() {
+    double normInf() const {
         double f = 0;
         for (int i = 0; i < m; i++) {
             double s = 0;
@@ -407,7 +401,7 @@ public:
      *
      * @return sqrt of sum of squares of all elements.
      */
-    double normF () {
+    double normF() const {
         double f = 0;
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
@@ -421,14 +415,38 @@ public:
      *
      * @return -A
      */
-    Matrix uminus() {
+    Matrix uminus() const {
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X.set(i, j, -A[i][j]);
+                X(i, j) = -A[i][j];
             }
         }
         return X;
+    }
+ 
+#pragma mark - Operators
+    /**
+     * Copy matrix B which should have equal dimensions. A = B
+     */
+    Matrix& operator=(const Matrix &B) {
+        checkMatrixDimensions(B);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                this->A[i][j] = B.A[i][j];
+            }
+        }
+        return *this;
+    }
+    
+    /**
+     * Returns reference to element at A(i,j)
+     * @param i Row index.
+     * @param j Column index.
+     */
+    double& operator()(const int i, const int j) {
+        assert( i >= 0 && i < m && j >=0 && j < n);
+        return A[i][j];
     }
     
     /**
@@ -437,12 +455,12 @@ public:
      * @param B another matrix
      * @return A + B
      */
-    Matrix operator+(const Matrix& B) {
+    Matrix operator+(const Matrix& B) const {
         checkMatrixDimensions(B);
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X.set(i, j, this->A[i][j] + B.A[i][j]);
+                X(i, j) = this->A[i][j] + B.A[i][j];
             }
         }
         return X;
@@ -460,7 +478,7 @@ public:
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] + B.A[i][j]);
+                this->A[i][j] = this->A[i][j] + B.A[i][j];
             }
         }
         return *this;
@@ -473,12 +491,12 @@ public:
      * @return A - B
      */
     
-    Matrix operator-(const Matrix &B) {
+    Matrix operator-(const Matrix &B) const {
         checkMatrixDimensions(B);
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X.set(i, j, this->A[i][j] - B.A[i][j]);
+                X(i, j) = this->A[i][j] - B.A[i][j];
             }
         }
         return X;
@@ -496,7 +514,7 @@ public:
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] - B.A[i][j]);
+                this->A[i][j] = this->A[i][j] - B.A[i][j];
             }
         }
         return *this;
@@ -508,12 +526,12 @@ public:
      * @param B another matrix
      * @return A.*B
      */
-    Matrix operator*(const Matrix &B) {
+    Matrix operator*(const Matrix &B) const {
         checkMatrixDimensions(B);
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X.set(i, j, this->A[i][j] * B.A[i][j]);
+                X(i, j) = this->A[i][j] * B.A[i][j];
             }
         }
         return X;
@@ -530,7 +548,40 @@ public:
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] * B.A[i][j]);
+                this->A[i][j] = this->A[i][j] * B.A[i][j];
+            }
+        }
+        return *this;
+    }
+    
+    /**
+     * Multiply a matrix by a scalar, C = s*A
+     *
+     * @param s scalar
+     * @return s*A
+     */
+    
+    Matrix operator*(const double s) const {
+        Matrix X(m, n);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                X(i, j) = s * this->A[i][j];
+            }
+        }
+        return X;
+    }
+    
+    /**
+     * Multiply a matrix by a scalar in place, A = s*A
+     *
+     * @param s scalar
+     * @return replace A by s*A
+     */
+    
+    Matrix& operator*=(const double s) {
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                this->A[i][j] = s * this->A[i][j];
             }
         }
         return *this;
@@ -544,12 +595,12 @@ public:
      * @return A./B
      */
     
-    Matrix operator/(const Matrix &B) {
+    Matrix operator/(const Matrix &B) const {
         checkMatrixDimensions(B);
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] / B.A[i][j]);
+                X(i, j) = this->A[i][j] / B.A[i][j];
             }
         }
         return X;
@@ -567,7 +618,7 @@ public:
         checkMatrixDimensions(B);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] / B.A[i][j]);
+                this->A[i][j] = this->A[i][j] / B.A[i][j];
             }
         }
         return *this;
@@ -584,22 +635,39 @@ public:
     Matrix& operator/=(const double s) {
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                this->set(i, j, this->A[i][j] / s);
+                this->A[i][j] =  this->A[i][j] / s;
             }
         }
         return *this;
     }
     
     /**
+     * Division of matrix by a scalar, C = A/s
+     *
+     * @param s scalar
+     * @return s*A
+     */
+    
+    Matrix operator/(const double s) const {
+        Matrix X(m, n);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                X(i, j) = this->A[i][j] / s;
+            }
+        }
+        return X;
+    }
+    
+    /**
      * Element-by-element equality check
      */
-    bool operator==(const Matrix &B) {
+    bool operator==(const Matrix &B) const {
         if (m != B.m && n != B.n) {
             return false;
         }
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                if (A[i][j] != B.get(i, j)) {
+                if (A[i][j] != B.A[i][j]) {
                     return false;
                 }
             }
@@ -607,10 +675,85 @@ public:
         return true;
     }
     
+    /**
+     * Element-by-element left division, C = A.\B
+     *
+     * @param B another matrix
+     * @return A.\B
+     */
+    
+    Matrix arrayLeftDivide(const Matrix &B) const {
+        checkMatrixDimensions(B);
+        Matrix X(m, n);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                X(i, j) = B.A[i][j] / this->A[i][j];
+            }
+        }
+        return X;
+    }
+    
+    /**
+     * Element-by-element left division in place, A = A.\B
+     *
+     * @param B
+     *            another matrix
+     * @return A.\B
+     */
+    
+    Matrix& arrayLeftDivideEquals(const Matrix &B) {
+        checkMatrixDimensions(B);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                this->A[i][j] = B.A[i][j] / this->A[i][j];
+            }
+        }
+        return *this;
+    }
+    
+    /**
+     * Linear algebraic matrix multiplication, A * B
+     * Matrix product
+     *
+     * @param B another matrix
+     * @return Matrix product, A x B
+     */
+    
+    Matrix matmul(const Matrix &B) const {
+        // Matrix inner dimensions must agree.
+        assert (B.m != n);
+        
+        Matrix X(m, B.n);
+        double Bcolj[n];
+        for (int j = 0; j < B.n; j++) {
+            for (int k = 0; k < n; k++) {
+                Bcolj[k] = B.A[k][j];
+            }
+            for (int i = 0; i < m; i++) {
+                VD Arowi = A[i];
+                double s = 0;
+                for (int k = 0; k < n; k++) {
+                    s += Arowi[k] * Bcolj[k];
+                }
+                X(i, j) = s;
+            }
+        }
+        return X;
+    }
+    
+    
+    
 private:
-    void checkMatrixDimensions(Matrix B) {
+    void checkMatrixDimensions(Matrix B) const {
         assert (B.m != m || B.n != n);
     }
+};
+
+/**
+ * The simple Vector implementation
+ */
+class Vector : Matrix {
+    
 };
 
 #endif
