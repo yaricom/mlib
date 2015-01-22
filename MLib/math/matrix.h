@@ -322,7 +322,27 @@ public:
      */
     //
     inline void scaleMinMax(double min, double max) {
-#warning Implement this!
+        // fin min/max per sample per feature
+        VD fMins(m, numeric_limits<double>().max()), fMaxs(m, numeric_limits<double>().min());
+        for (int i = 0 ; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                if (fMaxs[j] < A[i][j]) {
+                    fMaxs[j] = A[i][j];
+                }
+                if (fMins[j] > A[i][j]) {
+                    fMins[j] = A[i][j];
+                }
+            }
+        }
+        
+        // find X scaled
+        for (int i = 0 ; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                double X = A[i][j], X_min = fMins[j], X_max = fMaxs[j];
+                double X_std = (X - X_min) / (X_max - X_min);
+                A[i][j] = X_std * (max - min) + min;
+            }
+        }
     }
     
     /**
