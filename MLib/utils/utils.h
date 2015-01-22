@@ -47,12 +47,12 @@ template<class T> void print(std::vector < T > v) {cerr << "[";if (v.size()) cer
 
 // print matrix
 inline void print(Matrix &m) {
-    size_t rows = m.getRowDimension();
-    size_t cols = m.getColumnDimension();
+    size_t rows = m.rows();
+    size_t cols = m.cols();
     cerr << "[" << endl;
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            cerr << m.get(i, j);
+            cerr << m(i, j);
             if (j < cols - 1) {
                 cerr << ",\t";
             }

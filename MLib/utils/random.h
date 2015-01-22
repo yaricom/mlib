@@ -26,12 +26,12 @@ struct RNG {
     
     void generate() {
         const unsigned int MULT[] = {0, 2567483615UL};
-        REP(i, 227) {
+        for(int i = 0; i < 227; i++) {
             unsigned int y = (MT[i] & 0x8000000UL) + (MT[i+1] & 0x7FFFFFFFUL);
             MT[i] = MT[i+397] ^ (y >> 1);
             MT[i] ^= MULT[y&1];
         }
-        FOR(i, 227, 623) {
+        for(int i = 227; i < 623; i++) {
             unsigned int y = (MT[i] & 0x8000000UL) + (MT[i+1] & 0x7FFFFFFFUL);
             MT[i] = MT[i-227] ^ (y >> 1);
             MT[i] ^= MULT[y&1];
@@ -72,7 +72,7 @@ struct RNG {
     }
 };
 
-inline IndexType uniform_random_index()
+inline int uniform_random_index()
 {
 #ifdef CUSTOM_UNIFORM_RANDOM_INDEX_FUNCTION
     return CUSTOM_UNIFORM_RANDOM_INDEX_FUNCTION % std::numeric_limits<IndexType>::max();
@@ -81,12 +81,12 @@ inline IndexType uniform_random_index()
 #endif
 }
 
-inline IndexType uniform_random_index_bounded(IndexType upper)
+inline int uniform_random_index_bounded(int upper)
 {
     return uniform_random_index() % upper;
 }
 
-inline ScalarType uniform_random()
+inline double uniform_random()
 {
 #ifdef CUSTOM_UNIFORM_RANDOM_FUNCTION
     return CUSTOM_UNIFORM_RANDOM_FUNCTION;
@@ -95,12 +95,12 @@ inline ScalarType uniform_random()
 #endif
 }
 
-inline ScalarType gaussian_random()
+inline double gaussian_random()
 {
 #ifdef CUSTOM_GAUSSIAN_RANDOM_FUNCTION
     return CUSTOM_GAUSSIAN_RANDOM_FUNCTION;
 #else
-    ScalarType x, y, radius;
+    double x, y, radius;
     do {
         x = 2*(std::rand()/((double)RAND_MAX+1)) - 1;
         y = 2*(std::rand()/((double)RAND_MAX+1)) - 1;
@@ -116,34 +116,25 @@ inline ScalarType gaussian_random()
 template <class RAI>
 inline void random_shuffle(RAI first, RAI last)
 {
-    std::random_shuffle(first,last,uniform_random_index_bounded);
+    std::random_shuffle(first, last, uniform_random_index_bounded);
 }
 
-class RandomSample {
-    // class members
-    // generate "m_number" of data with the value within the range [0, m_max].
-    int m_max;
-    int m_number;
-    
-public:
-    RandomSample(int max, int number) : m_max(max), m_number(number) {}
-    
-    inline VI get_sample_index() {
-        // fill vector with indices
-        VI re_res(m_max);
-        for (int i = 0; i < m_max; ++i)
-            re_res[i] = i;
-        
-        // suffle
-        random_unique(re_res.begin(), re_res.end(), m_number);
-        
-        // resize vector
-        re_res.resize(m_number);
-        VI(re_res).swap(re_res);
-        
-        return re_res;
+/**
+ * Returns num_random samples of random values from range between begin and end.
+ * I.e. it is effectively shuffle vector of data between begin and end iterators within num_random samples.
+ */
+template<class bidiiter>
+inline bidiiter random_unique(bidiiter begin, bidiiter end, size_t num_random) {
+    size_t left = std::distance(begin, end);
+    while (num_random--) {
+        bidiiter r = begin;
+        std::advance(r, rand()%left);
+        std::swap(*begin, *r);
+        ++begin;
+        --left;
     }
-};
+    return begin;
+}
 
 
 #endif
