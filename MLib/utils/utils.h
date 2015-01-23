@@ -75,5 +75,20 @@ inline void print(Matrix &m) {
     cerr << "]" << endl;
 }
 
+// print vector
+inline void print(Vector &m) {
+    size_t size = m.size();
+    cerr << "[" << endl;
+    for (int i = 0; i < size; i++) {
+        cerr << m(i);
+        if (i < size - 1) {
+            cerr << ",\t";
+        }
+        
+        cerr << endl;
+    }
+    cerr << "]" << endl;
+}
+
 
 #endif

@@ -17,6 +17,8 @@ using namespace std;
  * The simple matrix implementation
  */
 class Matrix {
+    
+protected:
     /** Array for internal storage of elements. */
     VDD A;
     
@@ -28,6 +30,7 @@ class Matrix {
     
     
 public:
+    
     /**
      * Construct an m-by-n matrix of zeros.
      *
@@ -315,23 +318,18 @@ public:
     
 #pragma mark - Algebraic functions
     /**
-     * Scales matrix to have all samles scaled to fit range [min, max]
+     * Scales this matrix to have all samles scaled to fit range [min, max]
      *
      * X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
      * X_scaled = X_std * (max - min) + min
      */
-    //
-    inline void scaleMinMax(double min, double max) {
+    void scaleMinMax(double min, double max) {
         // fin min/max per sample per feature
-        VD fMins(m, numeric_limits<double>().max()), fMaxs(m, numeric_limits<double>().min());
+        VD fMins(n, numeric_limits<double>().max()), fMaxs(n, numeric_limits<double>().min());
         for (int i = 0 ; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                if (fMaxs[j] < A[i][j]) {
-                    fMaxs[j] = A[i][j];
-                }
-                if (fMins[j] > A[i][j]) {
-                    fMins[j] = A[i][j];
-                }
+                fMaxs[j] = std::max<double>(fMaxs[j], A[i][j]);
+                fMins[j] = std::min<double>(fMins[j], A[i][j]);
             }
         }
         
@@ -343,43 +341,6 @@ public:
                 A[i][j] = X_std * (max - min) + min;
             }
         }
-    }
-    
-    /**
-     * Calculates standard deviation of matrix by columns.
-     *
-     * @return the row vector containing the standard deviation of the elements of each column.
-     */
-    Matrix std() const {
-        Matrix mean = this->mean();
-        Matrix X(1, n);
-        double diff;
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                diff = this->A[i][j] - mean.A[0][j];
-                X.A[0][j] += diff * diff;
-            }
-        }
-        
-        for (int j = 0; j < n; j++) {
-            X.A[0][j] = sqrt(X.A[0][j] / (m - 1));
-        }
-        return X;
-    }
-    
-    
-    /**
-     * Calculates matrix mean by columns
-     */
-    Matrix mean() const {
-        Matrix current(1, n);
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                current.A[0][j] += this->A[i][j];
-            }
-        }
-        current /= m;
-        return current;
     }
     
     /**
@@ -430,6 +391,7 @@ public:
         }
         return f;
     }
+    
     /**
      * Unary minus
      *
@@ -465,6 +427,16 @@ public:
      * @param j Column index.
      */
     double& operator()(const int i, const int j) {
+        assert( i >= 0 && i < m && j >=0 && j < n);
+        return A[i][j];
+    }
+    
+    /**
+     * Returns reference to element at A(i,j)
+     * @param i Row index.
+     * @param j Column index.
+     */
+    double operator()(const int i, const int j) const{
         assert( i >= 0 && i < m && j >=0 && j < n);
         return A[i][j];
     }
@@ -667,7 +639,6 @@ public:
      * @param s scalar
      * @return s*A
      */
-    
     Matrix operator/(const double s) const {
         Matrix X(m, n);
         for (int i = 0; i < m; i++) {
@@ -701,7 +672,6 @@ public:
      * @param B another matrix
      * @return A.\B
      */
-    
     Matrix arrayLeftDivide(const Matrix &B) const {
         checkMatrixDimensions(B);
         Matrix X(m, n);
@@ -741,7 +711,7 @@ public:
     
     Matrix matmul(const Matrix &B) const {
         // Matrix inner dimensions must agree.
-        assert (B.m != n);
+        assert (B.m == n);
         
         Matrix X(m, B.n);
         double Bcolj[n];
@@ -763,7 +733,7 @@ public:
     
     
     
-private:
+protected:
     void checkMatrixDimensions(Matrix B) const {
         assert (B.m != m || B.n != n);
     }
@@ -773,7 +743,166 @@ private:
  * The simple Vector implementation
  */
 class Vector : Matrix {
+public:
+    /**
+     * Constructs zero vector with the specified size.
+     * @param size the capacity of the vector
+     */
+    Vector(int size) : Matrix(size, 1) {}
+    
+    /**
+     * Constructs a vector with the specified list of values.
+     * @param lst a list of values
+     */
+    Vector(VD lst) : Matrix(lst.size(), 1) {
+        for (int i = 0; i < lst.size(); i++) {
+            A[i][0] = lst[i];
+        }
+    }
+    
+    /**
+     * Returns the number of values in this vector.
+     * @return the number of values in this vector.
+     */
+    size_t size() const {
+        return rows();
+    }
+    
+#pragma mark - Operators
+    /**
+     * Returns reference to element at A(i,j)
+     * @param i the index.
+     */
+    double& operator()(const int i) {
+        assert( i >= 0 && i < m);
+        return A[i][0];
+    }
+    
+    /**
+     * Copy vector B which should have equal dimensions. A = B
+     */
+    Vector& operator=(const Vector &B) {
+        checkMatrixDimensions(B);
+        for (int i = 0; i < m; i++) {
+            this->A[i][0] = B.A[i][0];
+        }
+        return *this;
+    }
+    
+    /**
+     * Returns the result of vector subtraction.
+     *
+     * @param vthe vector to subtract
+     * @return the result of vector subtraction.
+     */
+    Vector operator-(const Vector &v) {
+        checkMatrixDimensions(v);
+        int size = (int)this->size();
+        Vector result(size);
+        for (int i = 0; i < size; i++) {
+            result(i) = result(i) - v.A[i][0];
+        }
+        return result;
+    }
+    
+    /**
+     * Returns the result of vector addition.
+     *
+     * @param v
+     *            the vector to add
+     *
+     * @return the result of vector addition.
+     */
+    Vector operator+(const Vector &v) {
+        checkMatrixDimensions(v);
+        int size = (int)this->size();
+        Vector result(size);
+        for (int i = 0; i < size; i++) {
+            result(i) = result(i) + v.A[i][0];
+        }
+        return result;
+    }
+    
+    /**
+     * Element-by-element right division by scalar in place, A = A./s
+     *
+     * @param B another matrix
+     * @return A./B
+     */
+    
+    Vector& operator/=(const double s) {
+        for (int i = 0; i < m; i++) {
+            this->A[i][0] = this->A[i][0] / s;
+        }
+        return *this;
+    }
+    /**
+     * Element-by-element equality check
+     */
+    bool operator==(const Vector &B) const {
+        if (this->size() != B.size()) {
+            return false;
+        }
+        for (int i = 0; i < m; i++) {
+            if (this->A[i][0] != B.A[i][0]) {
+                return false;
+            }
+        }
+        return true;
+    }
     
 };
+
+#pragma mark - Matrix functions
+/**
+ * Calculates matrix mean by columns
+ */
+Vector& mean(const Matrix &m){
+    size_t cols = m.cols(), rows = m.rows();
+    Vector *current = new Vector((int)cols);
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            (*current)(j) += m(i, j);
+        }
+    }
+    (*current) /= rows;
+    return *current;
+}
+
+/**
+ * Calculates variance of matrix by columns.
+ *
+ * @return the row vector containing the variance of the elements per column.
+ */
+Vector& variance(const Matrix &m){
+    Vector vmean = mean(m);
+    size_t cols = m.cols(), rows = m.rows();
+    
+    Vector *X = new Vector((int)cols);
+    double diff;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            diff = m(i, j) - vmean(j);
+            (*X)(j) += diff * diff;
+        }
+    }
+
+    return *X;
+}
+
+/**
+ * Calculates standard deviation of matrix by columns.
+ *
+ * @return the row vector containing the standard deviation of the elements of each column.
+ */
+Vector& stdev(const Matrix &m)  {
+    Vector &var = variance(m);
+    size_t n = var.size();
+
+    for (int j = 0; j < n; j++) {
+        var(j) = sqrt(var(j) / (n - 1));
+    }
+    return var;
+}
 
 #endif
