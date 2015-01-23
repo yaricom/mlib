@@ -581,6 +581,7 @@
 				78EA4E611A718B1100A5096F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
