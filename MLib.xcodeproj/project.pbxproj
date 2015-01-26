@@ -96,7 +96,6 @@
 		78EA4D751A704FE000A5096F /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		78EA4D7D1A70510A00A5096F /* matrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = matrix.h; sourceTree = "<group>"; };
 		78EA4D801A70510A00A5096F /* dim_reduction_methods.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dim_reduction_methods.h; sourceTree = "<group>"; };
-		78EA4D811A70510A00A5096F /* random_projection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = random_projection.h; sourceTree = "<group>"; };
 		78EA4D821A70510A00A5096F /* stdc++.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "stdc++.h"; sourceTree = "<group>"; };
 		78EA4D841A70510A00A5096F /* random.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = random.h; sourceTree = "<group>"; };
 		78EA4D851A70510A00A5096F /* utils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
@@ -308,7 +307,6 @@
 			isa = PBXGroup;
 			children = (
 				78EA4D801A70510A00A5096F /* dim_reduction_methods.h */,
-				78EA4D811A70510A00A5096F /* random_projection.h */,
 			);
 			path = preprocessing;
 			sourceTree = "<group>";
