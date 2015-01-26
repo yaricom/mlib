@@ -102,8 +102,8 @@ inline double gaussian_random()
 #else
     double x, y, radius;
     do {
-        x = 2*(std::rand()/((double)RAND_MAX+1)) - 1;
-        y = 2*(std::rand()/((double)RAND_MAX+1)) - 1;
+        x = 2 * (std::rand() / ((double)RAND_MAX + 1)) - 1;
+        y = 2 * (std::rand() / ((double)RAND_MAX + 1)) - 1;
         radius = (x * x) + (y * y);
     } while ((radius >= 1.0) || (radius == 0.0));
     radius = std::sqrt(-2 * std::log(radius) / radius);

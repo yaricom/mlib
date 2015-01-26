@@ -9,53 +9,56 @@
 #include "defines.h"
 #include "matrix.h"
 #include "utils.h"
+#include "dim_reduction_methods.h"
 
 class TestMatrix : public unitpp::suite {
     
     void checkMatrixMean() {
         Printf("Matrix mean+++++++++++++++++++++++++++\n");
-        VD data = {0, 1, 1, 2, 3, 2, 1, 3, 2, 4, 2, 2};
-        Matrix m(3, data);
+        Matrix m(3, {0, 1, 1,
+                    2, 3, 2,
+                    1, 3, 2,
+                    4, 2, 2});
         print(m);
-        Vector vmean = mean(m);
+        Vector vmean = m.mean();
         print(vmean);
         
-        VD test = {1.75, 2.25, 1.75};
-        Vector tm(test);
+        Vector tm({1.75, 2.25, 1.75});
         unitpp::assert_true("Calculated matrix mean is wrong!", vmean == tm);
     }
     
     void checkMatrixVariance() {
         Printf("Matrix Variance+++++++++++++++++++++++++++\n");
-        VD data = {4, -2, 1, 9, 5, 7};
-        Matrix m(3, data);
+        Matrix m(3, {4, -2, 1,
+                    9, 5, 7});
         print(m);
         
-        Vector var = variance(m);
+        Vector var = m.variance(1);
         print(var);
         
-        VD test = {12.5000, 24.5000, 18.0000};
-        Vector tm(test);
+        Vector tm({12.5000, 24.5000, 18.0000});
         unitpp::assert_true("Calculated matrix variance is wrong!", var == tm);
     }
     
     void checkMatrixStd() {
         Printf("Matrix STD+++++++++++++++++++++++++++\n");
-        VD data = {1, 5, 9, 7, 15, 22};
-        Matrix m(3, data);
+        Matrix m(3, {1, 5, 9,
+                    7, 15, 22});
         print(m);
         
-        Vector std = stdev(m);
-        print(std);
+        Vector stdM = m.stdev(1);
+        print(stdM);
         
-        VD test = {4.2426406871192848, 7.0710678118654755, 9.1923881554251174};
-        Vector tm(test);
-        unitpp::assert_true("Calculated matrix std deviation is wrong!", std == tm);
+        Vector tm({4.242640, 7.071067, 9.192388});
+        unitpp::assert_true("Calculated matrix std deviation is wrong!", stdM.similar(tm, 0.000001));
     }
     
     void checkRawAccess() {
         Printf("Raw access+++++++++++++++++++++++++++\n");
-        VD data = {0, 1, 1, 2, 3, 2, 1, 3, 2, 4, 2, 2};
+        VD data = { 0, 1, 1,
+                    2, 3, 2,
+                    1, 3, 2,
+                    4, 2, 2};
         Matrix m(3, data);
         print(m);
         
@@ -87,8 +90,10 @@ class TestMatrix : public unitpp::suite {
     
     void checkCopy() {
         Printf("Check copy+++++++++++++++++++++++++++\n");
-        VD data = {0, 1, 1, 2, 3, 2, 1, 3, 2, 4, 2, 2};
-        Matrix m(3, data);
+        Matrix m(3, {0, 1, 1,
+                    2, 3, 2,
+                    1, 3, 2,
+                    4, 2, 2});
         print(m);
         
         Matrix test = m;
@@ -99,47 +104,105 @@ class TestMatrix : public unitpp::suite {
     
     void checkScaleMinMax() {
         Printf("Check scale Min-Max+++++++++++++++++++++++++++\n");
-        VD data = {1, 5, 9, 2, 3, 39, 7, 15, 22};
-        Matrix m(3, data);
+        Matrix m(3, {1, 5, 9,
+                    2, 3, 39,
+                    7, 15, 22});
         print(m);
         
         double min = -1;
         double max = 1;
-        m.scaleMinMax(min, max);
-        print(m);
+        Matrix testM = m.scaleMinMax(min, max);
+        print(testM);
         
         double tMin = 1000, tMax = -1000;
-        for (int i = 0 ; i < m.rows(); i++) {
-            for (int j = 0; j < m.cols(); j++) {
-                if (tMax < m(i, j)) {
-                    tMax = m(i, j);
+        for (int i = 0 ; i < testM.rows(); i++) {
+            for (int j = 0; j < testM.cols(); j++) {
+                if (tMax < testM(i, j)) {
+                    tMax = testM(i, j);
                 }
-                if (tMin > m(i, j)) {
-                    tMin = m(i, j);
+                if (tMin > testM(i, j)) {
+                    tMin = testM(i, j);
                 }
             }
         }
         unitpp::assert_true(spf("Expected matrix min should be greater than: %f, but was: %f", min, tMin), tMin >= min);
         unitpp::assert_true(spf("Expected matrix max should be less than: %f, but was: %f", max, tMax), tMax <= max);
+        
+        // check scale by indices
+        VI indices = {0, 2};
+        Matrix testM2 = m.scaleMinMax(min, max, indices);
+        print(testM2);
+        Matrix checkM(3, {-1, 5, -1,
+                        -0.666666, 3, 1,
+                        1, 15, -0.133333});
+        
+        unitpp::assert_true("Scale by min/max with column indices failed", testM2.similar(checkM, 0.000001));
+    }
+    
+    void checkStdScale() {
+        Printf("Check standard scale+++++++++++++++++++++++++++\n");
+        Matrix m(3, {1, -2, 2,
+                    2, 0, 0,
+                    0, 1, -1});
+        print(m);
+        
+        Matrix testM = m.stdScale();
+        print(testM);
+        
+        Vector stdev = testM.stdev(1);
+        Vector checkDev({1, 1, 1});
+
+        unitpp::assert_true("Wrong std deviance values after matrix scale", checkDev.similar(stdev, .000001));
+        
+        Vector stdMean = testM.mean();
+        Vector checkMean({0, 0, 0});
+        unitpp::assert_true("Wrong mean values after matrix scale", stdMean.similar(checkMean, .000001));
+        
+        // check scale by indices
+        VI indices = {0, 2};
+        Matrix testM2 = m.stdScale(indices);
+        print(testM2);
+        
+        Vector stdev2 = testM2.stdev(1);
+        unitpp::assert_true("Wrong std deviance values after matrix scale by indices", abs(stdev2[0] - stdev2[2]) <  .000001);
+        Vector stdMean2 = testM2.mean();
+        unitpp::assert_true("Wrong mean values after matrix scale by indices", stdMean2[0] == stdMean2[2] && stdMean2[0] == 0);
     }
     
     void checkMatrixProduct() {
         Printf("Check Matrix Product+++++++++++++++++++++++++++\n");
-        VD dataA = {1, 2, 3, 4, 5, 6, 7, 8};
-        Matrix A(2, dataA);
+        Matrix A(2, {1, 2,
+                    3, 4,
+                    5, 6,
+                    7, 8});
         print(A);
         
-        VD dataB = {1, 2, 3, 4, 5, 6};
-        Matrix B(3, dataB);
+        Matrix B(3, {1, 2, 3,
+                    4, 5, 6});
         print(B);
         
         Matrix C = A.matmul(B);
         print(C);
         
-        VD dataCheck = {9, 12, 15, 19, 26, 33, 29, 40, 51, 39, 54, 69};
-        Matrix test(3, dataCheck);
+        Matrix test(3, {9, 12, 15,
+                        19, 26, 33,
+                        29, 40, 51,
+                        39, 54, 69});
         
         unitpp::assert_true("Calculated matrix product is wrong!", C == test);
+    }
+    
+    void checkGaussianRandomProjection() {
+        Printf("Check Gaussian Random Projection+++++++++++++++++++++++++++\n");
+        Matrix mat(4, {9, 12, 15, 21,
+                        19, 26, 33, 35,
+                        29, 40, 51, 14,
+                        39, 54, 69, 67});
+        print(mat);
+        
+        int target_dim = 3;
+        Matrix res = randomProjection(mat, target_dim);
+        print(res);
     }
     
 public:
@@ -151,7 +214,10 @@ public:
         add("checkRawAccess", unitpp::testcase(this, "Matrix Raw access test", &TestMatrix::checkRawAccess));
         add("checkCopy", unitpp::testcase(this, "Matrix Check copy test", &TestMatrix::checkCopy));
         add("checkScaleMinMax", unitpp::testcase(this, "Matrix Scale Min-Max test", &TestMatrix::checkScaleMinMax));
+        add("checkStdScale", unitpp::testcase(this, "Matrix Standard Scale test", &TestMatrix::checkStdScale));
         add("checkMatrixProduct", unitpp::testcase(this, "Matrix Product test", &TestMatrix::checkMatrixProduct));
+        
+        add("checkGaussianRandomProjection", unitpp::testcase(this, "Matrix Gaussian Random Projection test", &TestMatrix::checkGaussianRandomProjection));
         
         // add this suite to the main suite
         suite::main().add("Matrix", this);

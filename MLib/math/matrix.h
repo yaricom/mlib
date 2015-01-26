@@ -13,6 +13,8 @@
 
 using namespace std;
 
+class Vector;
+
 /*
  * The simple matrix implementation
  */
@@ -316,32 +318,99 @@ public:
         return X;
     }
     
-#pragma mark - Algebraic functions
+#pragma mark - Preprocessing functions
     /**
-     * Scales this matrix to have all samles scaled to fit range [min, max]
+     * Scales this matrix to have all samles scaled to fit range [min, max] per features vectors
      *
-     * X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
+     * X_std = (X - X.min) / (X.max - X.min)
      * X_scaled = X_std * (max - min) + min
+     *
+     * @param min the minimal range limit inclusive
+     * @param max the maximal range limit inclusive
+     * @param indices the column's indices for processing
      */
-    void scaleMinMax(double min, double max) {
+    Matrix& scaleMinMax(const double min, const double max, const VI &indices) {
+        size_t ind_size = indices.size();
+        assert(ind_size <= n);
+        
+        Matrix *outM = new Matrix(this->A);
         // fin min/max per sample per feature
         VD fMins(n, numeric_limits<double>().max()), fMaxs(n, numeric_limits<double>().min());
         for (int i = 0 ; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                fMaxs[j] = std::max<double>(fMaxs[j], A[i][j]);
-                fMins[j] = std::min<double>(fMins[j], A[i][j]);
+            for (int index : indices) {
+                assert(index < n);
+                fMaxs[index] = std::max<double>(fMaxs[index], outM->A[i][index]);
+                fMins[index] = std::min<double>(fMins[index], outM->A[i][index]);
             }
         }
         
         // find X scaled
         for (int i = 0 ; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                double X = A[i][j], X_min = fMins[j], X_max = fMaxs[j];
+            for (int index : indices) {
+                double X = outM->A[i][index], X_min = fMins[index], X_max = fMaxs[index];
                 double X_std = (X - X_min) / (X_max - X_min);
-                A[i][j] = X_std * (max - min) + min;
+                outM->A[i][index] = X_std * (max - min) + min;
             }
         }
+        return *outM;
     }
+    
+    /**
+     * Scales this matrix to have all samles scaled to fit range [min, max] per features vectors
+     *
+     * @param min the minimal range limit inclusive
+     * @param max the maximal range limit inclusive
+     */
+    Matrix& scaleMinMax(const double min, const double max) {
+        // create indices array
+        VI indices(n, -1);
+        for (int j = 0; j < n; j++) {
+            indices[j] = j;
+        }
+        
+        return scaleMinMax(min, max, indices);
+    }
+    
+    /**
+     * Scales this matrix to have all values centered arround zero with standard deviation = 1
+     *
+     * @param indices the column's indices for processing
+     */
+    Matrix& stdScale(const VI &indices);
+    
+    /**
+     * Scales this matrix to have all values centered arround zero with standard deviation = 1
+     */
+    Matrix& stdScale();
+    
+#pragma mark - Algebraic functions
+    
+    /**
+     * Calculates matrix mean by columns
+     */
+    Vector& mean();
+    
+    /**
+     * Calculates variance of matrix by columns.
+     * @param m the matrix to be processed
+     * @param ddof “Delta Degrees of Freedom”: the divisor used in the calculation is N - ddof, where N represents the number of element.
+     * In standard statistical practice, ddof=1 provides an unbiased estimator of the variance of a hypothetical infinite population.
+     * ddof=0 provides a maximum likelihood estimate of the variance for normally distributed variables.
+     *
+     * @return the row vector containing the variance of the elements per column.
+     */
+    Vector& variance(const int ddof);
+    
+    /**
+     * Calculates standard deviation of matrix by columns.
+     * @param m the matrix to be processed
+     * @param ddof “Delta Degrees of Freedom”: the divisor used in the calculation is N - ddof, where N represents the number of element.
+     * In standard statistical practice, ddof=1 provides an unbiased estimator of the variance of a hypothetical infinite population.
+     * ddof=0 provides a maximum likelihood estimate of the variance for normally distributed variables.
+     *
+     * @return the row vector containing the standard deviation of the elements of each column.
+     */
+    Vector& stdev(const int ddof);
     
     /**
      * One norm
@@ -429,6 +498,14 @@ public:
     double& operator()(const int i, const int j) {
         assert( i >= 0 && i < m && j >=0 && j < n);
         return A[i][j];
+    }
+    
+    /**
+     * Subscript operator to access matrix rows
+     */
+    VD& operator[](const int row) {
+        assert( row >= 0 && row < m);
+        return A[row];
     }
     
     /**
@@ -650,7 +727,7 @@ public:
     }
     
     /**
-     * Element-by-element equality check
+     * Element-by-element exact equality check
      */
     bool operator==(const Matrix &B) const {
         if (m != B.m && n != B.n) {
@@ -659,6 +736,23 @@ public:
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 if (A[i][j] != B.A[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * Element-by-element similarity check, i.e. matrix values should differ with provided range.
+     */
+    bool similar(const Matrix &B, double diff) {
+        if (m != B.m && n != B.n) {
+            return false;
+        }
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                if (abs(A[i][j] - B.A[i][j]) > diff) {
                     return false;
                 }
             }
@@ -709,11 +803,11 @@ public:
      * @return Matrix product, A x B
      */
     
-    Matrix matmul(const Matrix &B) const {
+    Matrix& matmul(const Matrix &B) const {
         // Matrix inner dimensions must agree.
         assert (B.m == n);
         
-        Matrix X(m, B.n);
+        Matrix *X = new Matrix(m, B.n);
         double Bcolj[n];
         for (int j = 0; j < B.n; j++) {
             for (int k = 0; k < n; k++) {
@@ -725,10 +819,10 @@ public:
                 for (int k = 0; k < n; k++) {
                     s += Arowi[k] * Bcolj[k];
                 }
-                X(i, j) = s;
+                X->A[i][j] = s;
             }
         }
-        return X;
+        return *X;
     }
     
     
@@ -770,10 +864,9 @@ public:
     
 #pragma mark - Operators
     /**
-     * Returns reference to element at A(i,j)
-     * @param i the index.
+     * Subscript operator to access vector elements
      */
-    double& operator()(const int i) {
+    double& operator[](const int i) {
         assert( i >= 0 && i < m);
         return A[i][0];
     }
@@ -800,7 +893,7 @@ public:
         int size = (int)this->size();
         Vector result(size);
         for (int i = 0; i < size; i++) {
-            result(i) = result(i) - v.A[i][0];
+            result[i] = result[i] - v.A[i][0];
         }
         return result;
     }
@@ -818,7 +911,7 @@ public:
         int size = (int)this->size();
         Vector result(size);
         for (int i = 0; i < size; i++) {
-            result(i) = result(i) + v.A[i][0];
+            result[i] = result[i] + v.A[i][0];
         }
         return result;
     }
@@ -837,7 +930,7 @@ public:
         return *this;
     }
     /**
-     * Element-by-element equality check
+     * Element-by-element exact equality check
      */
     bool operator==(const Vector &B) const {
         if (this->size() != B.size()) {
@@ -851,58 +944,92 @@ public:
         return true;
     }
     
+    /**
+     * Element-by-element similarity check, i.e. matrix values should differ with provided range.
+     */
+    bool similar(const Vector &B, double diff) const {
+        if (this->size() != B.size()) {
+            return false;
+        }
+        for (int i = 0; i < m; i++) {
+            if (abs(this->A[i][0] - B.A[i][0]) > diff) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
 };
 
-#pragma mark - Matrix functions
-/**
- * Calculates matrix mean by columns
- */
-Vector& mean(const Matrix &m){
-    size_t cols = m.cols(), rows = m.rows();
+#pragma mark - Matrix functions implementations
+Vector& Matrix::mean(){
+    size_t cols = this->cols(), rows = this->rows();
     Vector *current = new Vector((int)cols);
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            (*current)(j) += m(i, j);
+            (*current)[j] += this->A[i][j];
         }
     }
     (*current) /= rows;
     return *current;
 }
 
-/**
- * Calculates variance of matrix by columns.
- *
- * @return the row vector containing the variance of the elements per column.
- */
-Vector& variance(const Matrix &m){
-    Vector vmean = mean(m);
-    size_t cols = m.cols(), rows = m.rows();
+Vector& Matrix::variance(const int ddof){
+    size_t cols = this->cols(), rows = this->rows();
+    assert(ddof < rows);
+    
+    Vector vmean = this->mean();
     
     Vector *X = new Vector((int)cols);
     double diff;
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            diff = m(i, j) - vmean(j);
-            (*X)(j) += diff * diff;
+            diff = this->A[i][j] - vmean[j];
+            (*X)[j] += diff * diff;
         }
+    }
+    
+    for (int j = 0; j < cols; j++) {
+        (*X)[j] /= (rows - ddof);
     }
 
     return *X;
 }
 
-/**
- * Calculates standard deviation of matrix by columns.
- *
- * @return the row vector containing the standard deviation of the elements of each column.
- */
-Vector& stdev(const Matrix &m)  {
-    Vector &var = variance(m);
+Vector& Matrix::stdev(const int ddof)  {
+    Vector &var = this->variance(ddof);
     size_t n = var.size();
 
     for (int j = 0; j < n; j++) {
-        var(j) = sqrt(var(j) / (n - 1));
+        var[j] = sqrt(var[j]);
     }
     return var;
+}
+
+Matrix& Matrix::stdScale(const VI &indices) {
+    size_t ind_size = indices.size();
+    assert(ind_size <= n);
+    
+    Vector meanV = this->mean();
+    Vector stdV = this->stdev(1);
+    
+    Matrix *outM = new Matrix(this->A);
+    for (int i = 0 ; i < m; i++) {
+        for (int index : indices) {
+            double X = outM->A[i][index];
+            outM->A[i][index] = (X - meanV[index]) / stdV[index];
+        }
+    }
+    return *outM;
+}
+
+Matrix& Matrix::stdScale() {
+    // create indices array
+    VI indices(n, -1);
+    for (int j = 0; j < n; j++) {
+        indices[j] = j;
+    }
+    return this->stdScale(indices);
 }
 
 #endif
