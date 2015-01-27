@@ -10,6 +10,7 @@
 #define activemoleculesC___Matrix_h
 
 #include "defines.h"
+#include "random.h"
 
 using namespace std;
 
@@ -303,21 +304,6 @@ public:
         }
     }
     
-    /**
-     * Matrix transpose.
-     *
-     * @return A'
-     */
-    Matrix transpose() {
-        Matrix X(n, m);
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                X(j, i) = A[i][j];
-            }
-        }
-        return X;
-    }
-    
 #pragma mark - Preprocessing functions
     /**
      * Scales this matrix to have all samles scaled to fit range [min, max] per features vectors
@@ -383,7 +369,55 @@ public:
      */
     Matrix& stdScale();
     
+#pragma mark - Static builders
+    /**
+     * Creates Matrix of specified dimensions with random values distributed with Gaussian.
+     */
+    static Matrix& gaussianRandom(int rows, int cols) {
+        Matrix *projection_matrix = new Matrix(rows, cols);
+        
+        double div = sqrt(static_cast<double>(rows));
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
+                projection_matrix->A[i][j] = gaussian_random() / div;
+            }
+        }
+        
+        return *projection_matrix;
+    }
+    
+    /**
+     * Generate identity matrix
+     * @param rows    Number of rows.
+     * @param cols    Number of colums.
+     * @return     An rows-by-cols matrix with ones on the diagonal and zeros elsewhere.
+     */
+    static Matrix& identity(int rows, int cols) {
+        Matrix *A = new Matrix(rows, cols);
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                A->A[i][j] = (i == j ? 1.0 : 0.0);
+            }
+        }
+        return *A;
+    }
+    
 #pragma mark - Algebraic functions
+    
+    /**
+     * Matrix transpose.
+     *
+     * @return A'
+     */
+    Matrix transpose() {
+        Matrix X(n, m);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                X(j, i) = A[i][j];
+            }
+        }
+        return X;
+    }
     
     /**
      * Calculates matrix mean by columns
