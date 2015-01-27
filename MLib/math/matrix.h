@@ -169,15 +169,15 @@ public:
      * @return A(i0:i1,j0:j1)
      */
     
-    Matrix subMatrix(int i0, int i1, int j0, int j1) {
+    Matrix& subMatrix(int i0, int i1, int j0, int j1) {
         assert(i0 >= 0 && i0 < i1 && i1 < m && j0 >= 0 && j0 < j1 && j1 < n);
-        Matrix X(i1 - i0 + 1, j1 - j0 + 1);
+        Matrix *X = new Matrix(i1 - i0 + 1, j1 - j0 + 1);
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
-                X(i - i0, j - j0) = A[i][j];
+                X->A[i - i0][j - j0] = A[i][j];
             }
         }
-        return X;
+        return *X;
     }
     
     /**
@@ -188,16 +188,16 @@ public:
      * @param c Array of column indices.
      * @return A(i0:i1,c(:))
      */
-    Matrix subMatrix(const int i0, const int i1, const VI &c) {
+    Matrix& subMatrix(const int i0, const int i1, const VI &c) {
         assert(i0 >= 0 && i0 < i1 && i1 < m);
-        Matrix X(i1 - i0 + 1, c.size());
+        Matrix *X = new Matrix(i1 - i0 + 1, c.size());
         for (int i = i0; i <= i1; i++) {
             for (int j = 0; j < c.size(); j++) {
                 assert(c[j] < n && c[j] >= 0);
-                X(i - i0, j) = A[i][c[j]];
+                X->A[i - i0][j] = A[i][c[j]];
             }
         }
-        return X;
+        return *X;
     }
     
     /**
@@ -214,16 +214,16 @@ public:
      *                Submatrix indices
      */
     
-    Matrix subMatrix(const VI &r, const int j0, const int j1) {
+    Matrix& subMatrix(const VI &r, const int j0, const int j1) {
         assert(j0 >= 0 && j0 < j1 && j1 < n);
-        Matrix X(r.size(), j1 - j0 + 1);
+        Matrix *X = new Matrix(r.size(), j1 - j0 + 1);
         for (int i = 0; i < r.size(); i++) {
             assert(r[i] < m && r[i] >= 0);
             for (int j = j0; j <= j1; j++) {
-                X(i, j - j0) = A[r[i]][j];
+                X->A[i][j - j0] = A[r[i]][j];
             }
         }
-        return X;
+        return *X;
     }
     
     /**
@@ -369,6 +369,14 @@ public:
      */
     Matrix& stdScale();
     
+    /**
+     * Correct outliers in the specified columns.
+     * @param indices The columns indices.
+     * @param of The factor for outlier detection. (default: 3)
+     * @param evf The factor for extreme values detection. (default: 2 * Outlier Factor)
+     */
+    Matrix& correctOutliners(const VI &indices, const double of = 3, const double evf = 6);
+    
 #pragma mark - Static builders
     /**
      * Creates Matrix of specified dimensions with random values distributed with Gaussian.
@@ -409,14 +417,14 @@ public:
      *
      * @return A'
      */
-    Matrix transpose() {
-        Matrix X(n, m);
+    Matrix& transpose() {
+        Matrix *X = new Matrix(n, m);
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
-                X(j, i) = A[i][j];
+                X->A[j][i] = A[i][j];
             }
         }
-        return X;
+        return *X;
     }
     
     /**

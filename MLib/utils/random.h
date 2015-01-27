@@ -91,7 +91,7 @@ inline double uniform_random()
 #ifdef CUSTOM_UNIFORM_RANDOM_FUNCTION
     return CUSTOM_UNIFORM_RANDOM_FUNCTION;
 #else
-    return std::rand()/((double)RAND_MAX+1);
+    return std::rand() / ((double)RAND_MAX + 1);
 #endif
 }
 
