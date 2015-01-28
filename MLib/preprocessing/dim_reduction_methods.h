@@ -12,17 +12,23 @@
 #include "matrix.h"
 #include "random.h"
 
-/**
- * Makes Gaussian Random Projection of provided matrix to the target dimension, reducing features dimension.
- */
-Matrix& randomProjection(const Matrix &data, const int target_dimension) {
-    size_t current_dimension = data.cols();
-    
-    Matrix projection_matrix = Matrix::gaussianRandom((int)current_dimension, target_dimension);
-    
-    Matrix &projected = data.matmul(projection_matrix);
-    
-    return projected;
+namespace nologin {
+    namespace preprocessing {
+        
+        using namespace math;
+        /**
+         * Makes Gaussian Random Projection of provided matrix to the target dimension, reducing features dimension.
+         */
+        Matrix& randomProjection(const Matrix &data, const int target_dimension) {
+            size_t current_dimension = data.cols();
+            
+            Matrix projection_matrix = Matrix::gaussianRandom((int)current_dimension, target_dimension);
+            
+            Matrix &projected = data.matmul(projection_matrix);
+            
+            return projected;
+        }
+    }
 }
 
 #endif

@@ -7,7 +7,8 @@
 //
 
 #include <iostream>
-
+#include "io.h"
+#include "matrix.h"
 
 int main(int argc, const char * argv[]) {
     

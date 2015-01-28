@@ -6,10 +6,18 @@
 //  Copyright (c) 2015 yaric. All rights reserved.
 //
 #include "unit++/unit++.h"
+
 #include "defines.h"
 #include "matrix.h"
 #include "utils.h"
 #include "dim_reduction_methods.h"
+#include "features_normalization.h"
+#include "io.h"
+
+using namespace nologin;
+using namespace nologin::math;
+using namespace nologin::utils;
+using namespace nologin::preprocessing;
 
 class TestMatrix : public unitpp::suite {
     
@@ -111,7 +119,8 @@ class TestMatrix : public unitpp::suite {
         
         double min = -1;
         double max = 1;
-        Matrix testM = m.scaleMinMax(min, max);
+        Matrix testM = m;
+        scaleMinMax(min, max, testM);
         print(testM);
         
         double tMin = 1000, tMax = -1000;
@@ -130,7 +139,8 @@ class TestMatrix : public unitpp::suite {
         
         // check scale by indices
         VI indices = {0, 2};
-        Matrix testM2 = m.scaleMinMax(min, max, indices);
+        Matrix testM2 = m;
+        scaleMinMax(min, max, indices, testM2);
         print(testM2);
         Matrix checkM(3, {-1, 5, -1,
                         -0.666666, 3, 1,
@@ -146,7 +156,8 @@ class TestMatrix : public unitpp::suite {
                     0, 1, -1});
         print(m);
         
-        Matrix testM = m.stdScale();
+        Matrix testM = m;
+        stdScale(testM);
         print(testM);
         
         Vector stdev = testM.stdev(1);
@@ -160,7 +171,8 @@ class TestMatrix : public unitpp::suite {
         
         // check scale by indices
         VI indices = {0, 2};
-        Matrix testM2 = m.stdScale(indices);
+        Matrix testM2 = m;
+        stdScale(indices, testM2);
         print(testM2);
         
         Vector stdev2 = testM2.stdev(1);
@@ -205,6 +217,44 @@ class TestMatrix : public unitpp::suite {
         print(res);
     }
     
+    void checkCorrectOutliers() {
+        Printf("Check Correct Outliers+++++++++++++++++++++++++++\n");
+        Matrix mat(4, {-39, 12, 15, 21,
+                        15, 16, 23, 25,
+                        19, 26, 33, 35,
+                         9,  7, 15, 22,
+                        29, 40, 51, 14,
+                        34, 20, 40, 30,
+                        39, 54, 69, 167});
+        print(mat);
+        VI indices = {0, 3};
+        correctOutliers(indices, mat);
+        print(mat);
+        
+        unitpp::assert_true("Outliers was not corrected!", mat[0][0] > -99 && mat[3][3] < 167);
+    }
+    
+    void checkMatrixStore() {
+        Printf("Check Matrix Store/Load LibSVM+++++++++++++++++++++++++++\n");
+        Matrix mat(4, {-39, 12, 0, 21,
+                        15, 0, 23, 0,
+                        0, 26, 33, 35,
+                        9,  7, 0, 22,
+                        29, 40, 51, 14,
+                        34, 0, 0, 30,
+                        39, 54, 69, 167});
+        print(mat);
+        
+        string fileName = "/tmp/matrix.txt";
+        storeMatrixAsLibSVM(fileName.c_str(), mat);
+        
+        // load matrix and check result
+        Matrix &check = loadMatrixFromLibSVM(fileName.c_str());
+        print(check);
+        
+        unitpp::assert_true("Failed to store/load matrix in LibSVM format", mat == check);
+    }
+    
 public:
     TestMatrix() : suite("The Matrix Test Suite") {
         
@@ -218,6 +268,9 @@ public:
         add("checkMatrixProduct", unitpp::testcase(this, "Matrix Product test", &TestMatrix::checkMatrixProduct));
         
         add("checkGaussianRandomProjection", unitpp::testcase(this, "Matrix Gaussian Random Projection test", &TestMatrix::checkGaussianRandomProjection));
+        add("checkCorrectOutliers", unitpp::testcase(this, "Matrix Correct Outliers test", &TestMatrix::checkCorrectOutliers));
+        
+        add("checkMatrixStore", unitpp::testcase(this, "Matrix Store/Load LibSVM test", &TestMatrix::checkMatrixStore));
         
         // add this suite to the main suite
         suite::main().add("Matrix", this);

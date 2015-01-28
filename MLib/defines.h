@@ -11,10 +11,15 @@
 
 #include "stdc++.h"
 
+namespace nologin {
+    
 #define VC          vector
 #define VD          VC < double >
 #define VDD         VC < VD >
 #define VI          VC < int >
 #define FOR(i,a,b)  for(int i=(a);i<(b);++i)
+}
+
+
 
 #endif
