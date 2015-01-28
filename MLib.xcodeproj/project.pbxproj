@@ -37,6 +37,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7860EEBA1A78E98300505FED /* features_normalization.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = features_normalization.h; sourceTree = "<group>"; };
+		7860EEBB1A79271000505FED /* io.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = io.h; sourceTree = "<group>"; };
 		787588261A713CB300215119 /* dummy_callbacks.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = dummy_callbacks.hpp; sourceTree = "<group>"; };
 		787588271A713CB300215119 /* eigen_callbacks.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = eigen_callbacks.hpp; sourceTree = "<group>"; };
 		787588281A713CB300215119 /* neighbor_callbacks.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = neighbor_callbacks.hpp; sourceTree = "<group>"; };
@@ -306,6 +308,7 @@
 		78EA4D7E1A70510A00A5096F /* preprocessing */ = {
 			isa = PBXGroup;
 			children = (
+				7860EEBA1A78E98300505FED /* features_normalization.h */,
 				78EA4D801A70510A00A5096F /* dim_reduction_methods.h */,
 			);
 			path = preprocessing;
@@ -316,6 +319,7 @@
 			children = (
 				78EA4D841A70510A00A5096F /* random.h */,
 				78EA4D851A70510A00A5096F /* utils.h */,
+				7860EEBB1A79271000505FED /* io.h */,
 			);
 			path = utils;
 			sourceTree = "<group>";
