@@ -27,7 +27,7 @@ namespace nologin {
             
         protected:
             /** Array for internal storage of elements. */
-            VDD A;
+            VVD A;
             
             /** Row and column dimensions.
              * m row dimension.
@@ -59,7 +59,7 @@ namespace nologin {
              *
              * @param A Two-dimensional array of doubles.
              */
-            Matrix(const VDD &arr) {
+            Matrix(const VVD &arr) {
                 m = arr.size();
                 n = arr[0].size();
                 for (int i = 0; i < m; i++) {
