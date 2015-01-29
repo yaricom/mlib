@@ -13,6 +13,7 @@
 #include "dim_reduction_methods.h"
 #include "features_normalization.h"
 #include "io.h"
+#include "gradient_boosting_tree.h"
 
 using namespace nologin;
 using namespace nologin::math;

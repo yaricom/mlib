@@ -93,7 +93,19 @@ namespace nologin {
             }
             cerr << "]" << endl;
         }
-
+        
+        template <class T>
+        void concatenate(VC<T> &first, const VC<T> &second) {
+            size_t size = second.size();
+            if (first.size() < size) {
+                // resize
+                first.resize(size);
+            }
+            // update
+            for (int i = 0; i < size; i++) {
+                first[i] += second[i];
+            }
+        }
     }
 }
 

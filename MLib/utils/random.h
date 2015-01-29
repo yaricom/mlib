@@ -142,6 +142,31 @@ namespace nologin {
             return begin;
         }
         
+        class RandomSample {
+            // generate "m_number" of data samples with the value within the range [0, m_max].
+            int m_max;
+            int m_number;
+            
+        public:
+            RandomSample(int max, int number) : m_max(max), m_number(number) {}
+            
+            inline VI get_sample_index() {
+                // fill vector with indices
+                VI re_res(m_max);
+                for (int i = 0; i < m_max; ++i)
+                    re_res[i] = i;
+                
+                // suffle
+                random_unique(re_res.begin(), re_res.end(), m_number);
+                
+                // resize vector
+                re_res.resize(m_number);
+                VI(re_res).swap(re_res);
+                
+                return re_res;
+            }
+        };
+        
     }
 }
 #endif
