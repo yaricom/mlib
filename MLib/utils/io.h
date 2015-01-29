@@ -38,12 +38,18 @@ namespace nologin {
                 // write class value first
                 double val = mat(row, classCol);
                 fprintf(fp, "%f", val);
-                for (int col = 1; col < mat.cols(); col++) {
+                int index = 1;
+                for (int col = 0; col < mat.cols(); col++) {
+                    if (col == classCol) {
+                        // skip
+                        continue;
+                    }
                     val = mat(row, col);
                     if (val) {
                         // write only non zero
-                        fprintf(fp, " %d:%f", col, val);
+                        fprintf(fp, " %d:%f", index, val);
                     }
+                    index++;
                 }
                 fprintf(fp, "\n");
             }
@@ -86,9 +92,10 @@ namespace nologin {
             if (!(fp = fopen(fileName, "r"))) {
                 throw runtime_error("Failed to open file!");
             }
-            VDD data;
+            VVD data;
             VD classVal;
             char buf[2048];
+            int maxCols = 0;
             while (fscanf(fp,"%[^\n]\n", buf) == 1) {
                 int i = 0, index = 0;
                 float val = 0;
@@ -107,6 +114,11 @@ namespace nologin {
                                 row.resize(i, 0);
                             }
                             row[i - 1] = val;
+                            
+                            // store max column number
+                            if (i > maxCols) {
+                                maxCols = i;
+                            }
                         }
                     }
                 }
@@ -115,7 +127,21 @@ namespace nologin {
                 data.push_back(row);
             }
             
-#warning            // pass through the collected data and ckeck dimensions and append class values
+           // pass through the collected data and ckeck dimensions and append class values
+            for (int i = 0; i < data.size(); i++) {
+                if (data[i].size() < maxCols) {
+                    data[i].resize(maxCols, 0);
+                }
+                if (classCol < 0) {
+                    // append class value to the end
+                    data[i].push_back(classVal[i]);
+                } else {
+                    // insert class value at the specified position
+                    VD::iterator it = data[i].begin();
+                    data[i].insert(it + classCol, classVal[i]);
+                }
+            }
+            
             
             
             // close file
