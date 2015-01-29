@@ -13,7 +13,7 @@
 
 namespace nologin {
     
-#define VC          vector
+#define VC          std::vector
 #define VD          VC < double >
 #define VVD         VC < VD >
 #define VI          VC < int >

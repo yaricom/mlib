@@ -488,14 +488,6 @@ namespace nologin {
             }
             
             /**
-             * Subscript operator to access matrix rows
-             */
-            VD& operator[](const int row) {
-                assert( row >= 0 && row < m);
-                return A[row];
-            }
-            
-            /**
              * Returns reference to element at A(i,j)
              * @param i Row index.
              * @param j Column index.
@@ -505,6 +497,23 @@ namespace nologin {
                 return A[i][j];
             }
             
+            /**
+             * Subscript operator to access matrix rows
+             */
+            VD& operator[](const int row) {
+                assert( row >= 0 && row < m);
+                return A[row];
+            }
+            
+            /**
+             * Subscript operator to access matrix rows.
+             * Important - use with caution it will create row copy
+             */
+            VD operator[](const int row) const{
+                assert( row >= 0 && row < m);
+                return A[row];
+            }
+
             /**
              * C = A + B
              *
@@ -854,6 +863,14 @@ namespace nologin {
              * Subscript operator to access vector elements
              */
             double& operator[](const int i) {
+                assert( i >= 0 && i < m);
+                return A[i][0];
+            }
+            
+            /**
+             * Subscript operator to access vector elements
+             */
+            double operator[](const int i) const {
                 assert( i >= 0 && i < m);
                 return A[i][0];
             }
