@@ -175,6 +175,8 @@ namespace nologin {
             void addRow(const VD &row) {
                 assert(row.size() == n);
                 A.push_back(row);
+                // adjust row dimension
+                m = A.size();
             }
             
             /**
