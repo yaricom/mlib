@@ -94,6 +94,8 @@
 		787588621A713CB300215119 /* sparse.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = sparse.hpp; sourceTree = "<group>"; };
 		787588631A713CB300215119 /* time.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = time.hpp; sourceTree = "<group>"; };
 		7875888E1A715C2A00215119 /* matrix_unittest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = matrix_unittest.cpp; sourceTree = "<group>"; };
+		787AFD041A813BCC00D345CA /* estimators.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = estimators.h; sourceTree = "<group>"; };
+		787AFD051A813BCC00D345CA /* statistics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = statistics.h; sourceTree = "<group>"; };
 		78A8CDA11A7A9EC8000FACD3 /* gradient_boosting_tree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gradient_boosting_tree.h; sourceTree = "<group>"; };
 		78EA4D721A704FE000A5096F /* MLib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MLib; sourceTree = BUILT_PRODUCTS_DIR; };
 		78EA4D751A704FE000A5096F /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
@@ -310,6 +312,8 @@
 		78EA4D7C1A70510A00A5096F /* math */ = {
 			isa = PBXGroup;
 			children = (
+				787AFD041A813BCC00D345CA /* estimators.h */,
+				787AFD051A813BCC00D345CA /* statistics.h */,
 				78EA4D7D1A70510A00A5096F /* matrix.h */,
 			);
 			path = math;

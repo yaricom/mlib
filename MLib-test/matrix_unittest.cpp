@@ -14,6 +14,7 @@
 #include "features_normalization.h"
 #include "io.h"
 #include "gradient_boosting_tree.h"
+#include "estimators.h"
 
 using namespace nologin;
 using namespace nologin::math;
