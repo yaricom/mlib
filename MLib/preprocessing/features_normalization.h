@@ -198,6 +198,40 @@ namespace nologin {
             }
         }
         
+        VD expandRow(const VD &row) {
+            size_t N = row.size();
+            
+            VD rv, rvM, rvD;
+            for (int i = 0; i < N; i++) {
+                rv.push_back(row[i]);
+                
+                for (int j = 0; j < i; j++) {
+                    // find multiplication
+                    rvM.push_back(row[i] * row[j]);
+                    // find division
+                    double v = row[j] ? row[i] / row[j] : 0;
+                    rvD.push_back(v);
+                }
+            }
+            
+            // append vectors
+            rv.reserve(rv.size() + rvM.size() + rvD.size());
+            rv.insert(rv.end(), rvM.begin(), rvM.end());
+            rv.insert(rv.end(), rvD.begin(), rvD.end());
+            
+            return rv;
+        }
+        
+        Matrix& expandMatrixLineary(const Matrix &mat) {
+            VVD rv;
+            for (int i = 0; i < mat.rows(); i++) {
+                rv.push_back(expandRow(mat[i]));
+            }
+            
+            Matrix *ret = new Matrix(rv);
+            return *ret;
+        }
+        
     }
 }
 

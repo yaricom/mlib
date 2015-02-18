@@ -829,6 +829,7 @@ namespace nologin {
             void checkMatrixDimensions(Matrix B) const {
                 assert (B.m != m || B.n != n);
             }
+            
         };
         
         /**

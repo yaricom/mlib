@@ -115,6 +115,7 @@
 		78EA4EDA1A71915600A5096F /* tester.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = tester.h; sourceTree = "<group>"; };
 		78EA4EDC1A71915600A5096F /* unit++.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "unit++.cc"; sourceTree = "<group>"; };
 		78EA4EDD1A71915600A5096F /* unit++.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "unit++.h"; sourceTree = "<group>"; };
+		78FCEFD41A94F6710068FAA4 /* ridge_regression.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ridge_regression.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -297,6 +298,7 @@
 		78EA4D741A704FE000A5096F /* MLib */ = {
 			isa = PBXGroup;
 			children = (
+				78FCEFD31A94F6710068FAA4 /* regression */,
 				787588241A713CB300215119 /* tapkee */,
 				78EA4D7C1A70510A00A5096F /* math */,
 				78EA4D7E1A70510A00A5096F /* preprocessing */,
@@ -361,6 +363,14 @@
 				78EA4EDD1A71915600A5096F /* unit++.h */,
 			);
 			path = "unit++";
+			sourceTree = "<group>";
+		};
+		78FCEFD31A94F6710068FAA4 /* regression */ = {
+			isa = PBXGroup;
+			children = (
+				78FCEFD41A94F6710068FAA4 /* ridge_regression.h */,
+			);
+			path = regression;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

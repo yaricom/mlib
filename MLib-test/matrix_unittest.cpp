@@ -15,6 +15,7 @@
 #include "io.h"
 #include "gradient_boosting_tree.h"
 #include "estimators.h"
+#include "ridge_regression.h"
 
 using namespace nologin;
 using namespace nologin::math;
@@ -257,6 +258,18 @@ class TestMatrix : public unitpp::suite {
         unitpp::assert_true("Failed to store/load matrix in LibSVM format", mat == check);
     }
     
+    void checkExpandMatrix() {
+        Printf("Check Matrix Expand Lineary+++++++++++++++++++++++++++\n");
+        Matrix A(2, {1, 2,
+                    3, 4,
+                    5, 6,
+                    7, 8});
+        print(A);
+        
+        Matrix B = expandMatrixLineary(A);
+        print(B);
+    }
+    
 public:
     TestMatrix() : suite("The Matrix Test Suite") {
         
@@ -273,6 +286,8 @@ public:
         add("checkCorrectOutliers", unitpp::testcase(this, "Matrix Correct Outliers test", &TestMatrix::checkCorrectOutliers));
         
         add("checkMatrixStore", unitpp::testcase(this, "Matrix Store/Load LibSVM test", &TestMatrix::checkMatrixStore));
+        
+        add("checkExpandMatrix", unitpp::testcase(this, "Check Matrix Expand Lineary", &TestMatrix::checkExpandMatrix));
         
         // add this suite to the main suite
         suite::main().add("Matrix", this);
