@@ -61,6 +61,19 @@ namespace nologin {
         
 #define VERBOSE 0  /* 0 for detailed logs, -1 for summary */
         
+        struct RRConfig {
+            bool useBootstrap;
+            int bootstrapSamples;
+            int bootstrapMode;
+            int bootstrapIterations;
+            int regressionIterations;
+            int regressionMode;
+            
+            int approxSamples;
+            int approxMode;
+            int approxIterations;
+        };
+        
         class RidgeRegression {
             // regression coefficients
             VD regrCoef;
@@ -72,8 +85,8 @@ namespace nologin {
             // the OOB errors calculated if bootstrap used
             VD oobErrors;
             
-            // the flag to indicate whether to use bootstrap
-            bool useBootstrap;
+            // the configuration
+            RRConfig config;
             
             // the number of observations/samples
             size_t obs = -1;
@@ -105,11 +118,12 @@ namespace nologin {
                 obs = train.size();
                 
                 initDataStructures();
-                if (useBootstrap) {
-                    bootstrap(train, check, 20, 0, 100);
+                if (config.useBootstrap) {
+                    bootstrap(train, check, config.bootstrapSamples, config.bootstrapMode, config.bootstrapIterations);
+                    regress(train, check, config.regressionMode, config.regressionIterations, 1);
                 } else {
-                    initFeaturesSeed(train, check, 2, 5, 4);
-                    regress(train, check, 0, 100, 1);
+                    initFeaturesSeed(train, check, config.approxMode, config.approxSamples, config.approxIterations);
+                    regress(train, check, config.regressionMode, config.regressionIterations, 1);
                 }
             }
             
@@ -180,6 +194,14 @@ namespace nologin {
                 /* need to run Regress_init first if the data set is new */
                 Assert(init == 1, "Must run initDataStructures() fisrt.\n");
                 
+                // initialize data structure
+                if (seed==1) {
+                    regrCoefSeed.clear();
+                } else {
+                    seed=1;
+                }
+                regrCoefSeed.resize(var, 0);
+                
                 VVD bootTrain, bootTest;
                 VD bootCheck, bootCheckTest;
                 
@@ -232,7 +254,8 @@ namespace nologin {
                 }
                 
                 // store best regression coefficients as train results
-                regrCoef.swap(bestCoef);
+                //        regrCoef.swap(bestCoef);
+                regrCoefSeed.swap(bestCoef);
             }
             
             /**
@@ -309,11 +332,11 @@ namespace nologin {
                 for (iter = 0; iter < niter; iter++) {
                     if (mode == 0 || mode == 3) {
                         // 0: visits each variable sequentially starting with first
-                        l = 1 + (iter % (var - 1));
+                        l = iter % var;
                     } else {
                         // 1: visits variables in random order; should be the default mode
                         // 2: same as mode = 1, but lambda not randomized
-                        l = 1 + rand() % (var - 1);
+                        l = rand() % var;
                     }
                     
                     xd = 0; sp = 0;
