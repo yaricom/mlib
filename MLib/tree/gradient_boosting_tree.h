@@ -18,6 +18,14 @@ namespace nologin {
         using namespace math;
         using namespace utils;
         
+        struct GBTConfig {
+            double sampling_size_ratio = 0.5;
+            double learning_rate = 0.01;
+            int tree_number = 130;
+            int tree_min_nodes = 10;
+            int tree_depth = 3;
+        };
+        
         struct Node {
             double m_node_value;
             int m_feature_index;
@@ -148,27 +156,27 @@ namespace nologin {
             /*
              *  The method to build regression tree
              */
-            void buildRegressionTree(const Matrix &feature_x, const Vector &obs_y) {
-                size_t samples_num = feature_x.rows();
+            void buildRegressionTree(const VC<VD> &samples_x, const VD &obs_y) {
+                size_t samples_num = samples_x.size();
                 
                 Assert(samples_num == obs_y.size() && samples_num != 0,
                        "The number of samles does not match with the number of observations or the samples number is 0. Samples: %i", samples_num);
                 
                 Assert (m_min_nodes * 2 <= samples_num, "The number of samples is too small");
                 
-                size_t feature_dim = feature_x.cols();
+                size_t feature_dim = samples_x[0].size();
                 features_importance.resize(feature_dim, 0);
                 
                 // build the regression tree
-                buildTree(feature_x, obs_y);
+                buildTree(samples_x, obs_y);
             }
             
         private:
             
-            /**
+            /*
              *  The following function gets the best split given the data
              */
-            BestSplit findOptimalSplit(const Matrix &feature_x, const Vector &obs_y) {
+            BestSplit findOptimalSplit(const VC<VD> &samples_x, const VD &obs_y) {
                 
                 BestSplit split_point;
                 
@@ -176,13 +184,13 @@ namespace nologin {
                     return split_point;
                 }
                 
-                size_t samples_num = feature_x.rows();
+                size_t samples_num = samples_x.size();
                 
                 if (m_min_nodes * 2 > samples_num) {
                     // the number of observations in terminals is too small
                     return split_point;
                 }
-                size_t feature_dim = feature_x.cols();
+                size_t feature_dim = samples_x[0].size();
                 
                 
                 double min_err = 0;
@@ -196,7 +204,7 @@ namespace nologin {
                     // get data sorted by the loop_i-th feature
                     VC<ListData> list_feature;
                     for (int loop_j = 0; loop_j < samples_num; loop_j++) {
-                        list_feature.push_back(ListData(feature_x(loop_j, loop_i), obs_y[loop_j]));
+                        list_feature.push_back(ListData(samples_x[loop_j][loop_i], obs_y[loop_j]));
                     }
                     
                     // sort the list
@@ -282,11 +290,11 @@ namespace nologin {
                 return split_point;
             }
             
-            /**
+            /*
              *  Split data into the left node and the right node based on the best splitting
              *  point.
              */
-            SplitRes splitData(const Matrix &feature_x, const Vector &obs_y, const BestSplit &best_split) {
+            SplitRes splitData(const VC<VD> &samples_x, const VD &obs_y, const BestSplit &best_split) {
                 
                 SplitRes split_res;
                 
@@ -295,15 +303,15 @@ namespace nologin {
                 
                 size_t samples_count = obs_y.size();
                 for (int loop_i = 0; loop_i < samples_count; loop_i++) {
-                    VD ith_feature = feature_x[loop_i];
-                    if (ith_feature[feature_index] < node_value) {
+                    VD ith_sample = samples_x[loop_i];
+                    if (ith_sample[feature_index] < node_value) {
                         // append to the left feature
-                        split_res.m_feature_left.push_back(ith_feature);
+                        split_res.m_feature_left.push_back(ith_sample);
                         // observation
                         split_res.m_obs_left.push_back(obs_y[loop_i]);
                     } else {
                         // append to the right
-                        split_res.m_feature_right.push_back(ith_feature);
+                        split_res.m_feature_right.push_back(ith_sample);
                         split_res.m_obs_right.push_back(obs_y[loop_i]);
                     }
                 }
@@ -369,12 +377,12 @@ namespace nologin {
             /*
              *  The following function builds a regression tree from data
              */
-            Node* buildTree(const Matrix &feature_x, const Vector &obs_y) {
+            Node* buildTree(const VC<VD> &samples_x, const VD &obs_y) {
                 
                 // obtain the optimal split point
                 m_current_depth = m_current_depth + 1;
                 
-                BestSplit best_split = findOptimalSplit(feature_x, obs_y);
+                BestSplit best_split = findOptimalSplit(samples_x, obs_y);
                 
                 if (!best_split.m_status) {
                     if (m_current_depth > 0)
@@ -387,7 +395,7 @@ namespace nologin {
                 features_importance[best_split.m_feature_index] += 1;
                 
                 // split the data
-                SplitRes split_data = splitData(feature_x, obs_y, best_split);
+                SplitRes split_data = splitData(samples_x, obs_y, best_split);
                 
                 // append current value to tree
                 Node *new_node = new Node(best_split.m_node_value, best_split.m_feature_index, split_data.m_left_value, split_data.m_right_value);
@@ -418,7 +426,6 @@ namespace nologin {
             VC<RegressionTree> m_trees;
             // the learning rate
             double m_combine_weight;
-            
             
             // construction function
             PredictionForest(double learning_rate) : m_init_value(0.0), m_combine_weight(learning_rate) {}
@@ -495,6 +502,10 @@ namespace nologin {
                 Assert(samples_num == input_x.size() && samples_num > 0,
                        "Error: The input_x size should not be zero and should match the size of input_y");
                 
+                // holds indices of training data samples used for trees training
+                // this will be used later for OOB error calculation
+                VI used_indices(samples_num, -1);
+                
                 // get an initial guess of the function
                 double mean_y = 0.0;
                 for (double d : input_y) {
@@ -545,6 +556,9 @@ namespace nologin {
                             // assign value
                             train_y.push_back(gradient[sel_index]);
                             train_x.push_back(input_x[sel_index]);
+                            
+                            // mark index as used
+                            used_indices[sel_index] = 1;
                         }
                         
                         // fit a regression tree
@@ -651,6 +665,7 @@ namespace nologin {
                             gradient_y.push_back(0.0);
                             gradient_y.push_back(0.0);
                         }
+                        //                cerr << "sel_index: " << sel_index << endl;
                     }
                     
                     // fit a regression tree
