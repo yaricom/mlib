@@ -16,6 +16,7 @@
 #include "gradient_boosting_tree.h"
 #include "estimators.h"
 #include "ridge_regression.h"
+#include "random.h"
 
 using namespace nologin;
 using namespace nologin::math;
@@ -293,4 +294,28 @@ public:
         suite::main().add("Matrix", this);
     }
 };
+
+class RandomTest : public unitpp::suite {
+    
+    void checkNextDouble() {
+        Printf("Check next double random number+++++++++++++++++++++++++++\n");
+        RNG rnd;
+        for (int i = 0; i < 1000; i++) {
+            double d = rnd.nextDouble();
+            Assert(d < 1 && d >= 0, "Random value if out of scope: %f", d);
+            Printf("%f\n", d);
+        }
+    }
+    
+    
+public:
+    RandomTest() : suite("Random test") {
+        add("checkNextDouble", unitpp::testcase(this, "Check next double random number", &RandomTest::checkNextDouble));
+        
+        // add this suite to the main suite
+        suite::main().add("Random", this);
+    }
+};
+
+RandomTest *test = new RandomTest();
 TestMatrix* theTest = new TestMatrix();
