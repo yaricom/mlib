@@ -104,7 +104,7 @@ namespace nologin {
             double MSE_init = 0;
             
         public:
-            RidgeRegression(bool bootstrap) : useBootstrap(bootstrap) {}
+            RidgeRegression(RRConfig config) : config(config) {}
             
             /**
              * Start training regression tree by finding regression coefficients
