@@ -17,6 +17,8 @@ namespace nologin {
 #define VD          VC < double >
 #define VVD         VC < VD >
 #define VI          VC < int >
+#define VVI         VC < VI >
+#define VB          VC < bool >
 #define FOR(i,a,b)  for(int i=(a);i<(b);++i)
     
 }

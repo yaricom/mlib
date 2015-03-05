@@ -209,7 +209,7 @@ namespace nologin {
              * @return A(i0:i1,c(:))
              */
             Matrix& subMatrix(const int i0, const int i1, const VI &c) {
-                assert(i0 >= 0 && i0 < i1 && i1 < m);
+                assert(i0 >= 0 && i0 <= i1 && i1 < m);
                 Matrix *X = new Matrix(i1 - i0 + 1, c.size());
                 for (int i = i0; i <= i1; i++) {
                     for (int j = 0; j < c.size(); j++) {
