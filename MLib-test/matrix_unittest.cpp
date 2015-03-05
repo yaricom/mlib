@@ -14,6 +14,7 @@
 #include "features_normalization.h"
 #include "io.h"
 #include "gradient_boosting_tree.h"
+#include "RF_regression.h"
 #include "estimators.h"
 #include "ridge_regression.h"
 #include "random.h"
