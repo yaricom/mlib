@@ -24,47 +24,69 @@ using namespace nologin;
 using namespace utils;
 using namespace std;
 
-#define NODE_TERMINAL -1
-#define NODE_TOSPLIT  -2
-#define NODE_INTERIOR -3
-//#define NULL 0
-
-#define swapInt(a, b) ((a ^= b), (b ^= a), (a ^= b))
-
-#define INT_SMALL
-#define uint32 unsigned long
-#define SMALL_INT char
-
 struct RF_config {
-    // number of cases in a node below which the tree will not split, setting nthsize=5 generally gives good results.
-    int nthsize = 5;
     // number of trees in run.  200-500 gives pretty good results
     int nTree = 500;
     // number of variables to pick to split on at each node.  mdim/3 seems to give genrally good performance, but it can be altered up or down
     int mtry;
-    // turns on variable importance.  This is computed for the mth variable as the percent rise in the test set mean sum-of-squared errors when the mth variable is randomly permuted.
-    bool varImp = false;
-    // indicates whether to compute proximities
-    bool doProx = false;
-    // should the proximity accumulation only count OOB cases? (0=no, 1=yes)
-    bool oobprox = false;
     
-    // whether to do bias correction of Y by linear regression
-    bool biasCorr;
-    
-    // whether to print header for running output
-    bool jprint = false;
-    // whether to use replacing when sampling during boosting
+    // 0 or 1 (default is 1) sampling with or without replacement
     bool replace = true;
+    // Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that
+    // the default values are different for classification (1) and regression (5).
+    int nodesize = 5;
+    // Should importance of predictors be assessed?
+    bool importance = false;
+    // Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+    bool localImp = false;
     
-    // the maximal number of categories for categorical ouytput
-    int maxcat = 1;
+    // Should proximity measure among the rows be calculated?
+    bool proximity = false;
+    // Should proximity be calculated only on 'out-of-bag' data?
+    bool oob_prox = false;
+    // Should an n by ntree matrix be returned that keeps track of which samples are 'in-bag' in which trees (but not how many times, if sampling with replacement)
+    bool keep_inbag = false;
+    // If set to TRUE, give a more verbose output as randomForest is run. If set to some integer, then running output is printed for every do_trace trees.
+    int do_trace = 1;
+    
+    // which happens only for regression. perform bias correction for regression? Note: Experimental.risk.
+    bool corr_bias = false;
+    // Number of times the OOB data are permuted per tree for assessing variable
+    // importance. Number larger than 1 gives slightly more stable estimate, but not
+    // very effective. Currently only implemented for regression.
+    int nPerm = 1;
+    // a 1xD true/false vector to say which features are categorical (true), which are numeric (false)
+    // maximum of 32 categories per feature is permitted
+    VB categorical_feature;
+    
+    // whether to run run test data prediction during training against current tree
+    bool testdat = false;//true;
+    // the number of test trees for test data predicitions
+    int nts = 10;
+    // controls whether to save test set MSE labels
+    bool labelts = true;
 };
+
+#define swapInt(a, b) ((a ^= b), (b ^= a), (a ^= b))
+
+#if !defined(ARRAY_SIZE)
+#define ARRAY_SIZE(x) (sizeof((x)) / sizeof((x)[0]))
+#endif
 
 /**
  * Do random forest regression.
  */
 class RF_Regression {
+    
+    typedef enum {
+        NODE_TERMINAL = -1,
+        NODE_TOSPLIT  = -2,
+        NODE_INTERIOR = -3
+    } NodeStatus;
+    
+    typedef char small_int;
+    
+    
     // the random number generator
     MT_RNG rnd;
     
@@ -72,61 +94,129 @@ class RF_Regression {
     int in_findBestSplit = 0; // 0 -initialize and normal.  1-normal  , -99 release
     int in_regTree = 0; //// 0 -initialize and normal.  1-normal  , -99 release
     
+    //
+    // the model definitions
+    //
+    /*  a matrix with nclass + 2 (for classification) or two (for regression) columns.
+     For classification, the first nclass columns are the class-specific measures
+     computed as mean decrease in accuracy. The nclass + 1st column is the
+     mean decrease in accuracy over all classes. The last column is the mean decrease
+     in Gini index. For Regression, the first column is the mean decrease in
+     accuracy and the second the mean decrease in MSE. If importance=FALSE,
+     the last measure is still returned as a vector. */
+    double *impout = NULL;
+    /*  The 'standard errors' of the permutation-based importance measure. For classification,
+     a p by nclass + 1 matrix corresponding to the first nclass + 1
+     columns of the importance matrix. For regression, a length p vector. */
+    double *impSD = NULL;
+    /*  a p by n matrix containing the casewise importance measures, the [i,j] element
+     of which is the importance of i-th variable on the j-th case. NULL if
+     localImp=FALSE. */
+    double *impmat = NULL;
+    // number of trees grown.
+    int ntree;
+    // number of predictors sampled for spliting at each node.
+    int mtry;
+    // the number of nodes to be created
+    int nrnodes;
+    // vector of mean square errors: sum of squared residuals divided by n.
+    double *mse = NULL;
+    // number of times cases are 'out-of-bag' (and thus used in computing OOB error estimate)
+    int *nout = NULL;
+    /*  if proximity=TRUE when randomForest is called, a matrix of proximity
+     measures among the input (based on the frequency that pairs of data points are
+     in the same terminal nodes). */
+    double *prox = NULL;
+    
+    int *ndtree = NULL;
+    small_int *nodestatus = NULL;
+    int *lDaughter = NULL;
+    int *rDaughter = NULL;
+    double *avnode = NULL;
+    int *mbest = NULL;
+    double *upper = NULL;
+    int *inbag = NULL;
+    double *coef = NULL;
+    double *y_pred_trn = NULL;
+    
+    // the number of categories per feature if any
+    int *ncat = NULL;
+    // the maximal number of categories in any feature
+    int maxcat;
+    // the original uniques per feature
+    int **orig_uniques_in_feature = NULL;
+    
 public:
     
-    VD rfPredict(const VVD &input_X, const VD &input_Y, const VVD &test_X, const RF_config &config) {
+    void train(const VVD &input_X, const VD &input_Y, const RF_config &config) {
         int n_size = (int)input_X.size(); // rows
         int p_size = (int)input_X[0].size(); // cols
         
         int sampsize = n_size;
-        int nodesize = config.nthsize;
+        int nodesize = config.nodesize;
         int nsum = sampsize;
-        int nrnodes = 2 * (int)((float)floor((float)(sampsize / ( 1 > (nodesize - 4) ? 1 : (nodesize - 4))))) + 1;
-        int ntree = config.nTree;
+        nrnodes = 2 * (int)((float)floor((float)(sampsize / ( 1 > (nodesize - 4) ? 1 : (nodesize - 4))))) + 1;
+        ntree = config.nTree;
         
         Printf("sampsize: %d, nodesize: %d, nsum %d, nrnodes %d\n", sampsize, nodesize, nsum, nrnodes);
-        Printf("maxcat: %i, doprox: %i, oobProx %i, biascorr %i\n", config.maxcat, config.doProx, config.oobprox, config.biasCorr);
+        Printf("doprox: %i, oobProx %i, biascorr %i\n", config.proximity, config.oob_prox, config.corr_bias);
         
         Assert(sampsize == input_Y.size(), "Number of samples must be equal to number of observations");
+        Assert(config.mtry > 0, "Please specify number of variables to pick to split on at each node.");
         
-        //mtry = nvar
-        int nvar=(floor((float)(p_size/3))>1)?floor((float)(p_size/3)):1;
-        int *cat; cat = (int*) calloc(p_size, sizeof(int));
+        mtry = config.mtry;
         
-        Printf("cat %d\n", p_size);
-        for ( int i = 0; i < p_size; i++) cat[i] = 1;
+        // prepare categorical inputs
+        ncat = (int*) calloc(p_size, sizeof(int));
+        if (config.categorical_feature.size() > 0) {
+            Assert(config.categorical_feature.size() == p_size, "If provided, than list of categorical features marks must have size equal to the features dimension");
+            orig_uniques_in_feature = (int **)malloc(p_size * sizeof(int *));
+            for (int i = 0; i < p_size; i++) {
+                if (config.categorical_feature[i]) {
+                    // map categorical features
+                    ncat[i] = findSortedUniqueFeaturesAndMap(input_X, i, orig_uniques_in_feature[i]);
+                } else {
+                    // just numerical value
+                    ncat[i] = 1;
+                }
+            }
+        } else {
+            // all features numerical - set all values just to ones
+            for (int i = 0; i < p_size; i++) ncat[i] = 1;
+        }
+        // find max of categroies
+        maxcat = 1;
+        for (int i = 0; i < p_size; i++) {
+            maxcat = max(maxcat, ncat[i]);
+        }
         
         //double y_pred_trn[n_size];
-        double *y_pred_trn; y_pred_trn = (double*) calloc(n_size, sizeof(double));
+        y_pred_trn = (double*) calloc(n_size, sizeof(double));
         
-        int imp[] = {0, 0, 1};
-        double *impout;
+        
+        int imp[] = {config.importance, config.localImp, config.nPerm};
         if (imp[0] == 1) {
             impout = (double*) calloc(p_size * 2, sizeof(double));
         } else {
             impout = (double*) calloc(p_size, sizeof(double));
         }
-        
-        double *impmat;
         if (imp[1] == 1) {
-            impmat = (double*) calloc(p_size*n_size, sizeof(double));
+            impmat = (double*) calloc(p_size * n_size, sizeof(double));
         } else {
             impmat = (double*) calloc(1, sizeof(double));
-            impmat[0]=0;
+            impmat[0] = 0;
         }
-        
-        double *impSD;
-        if (imp[2] == 1) {
+        if (imp[0] == 1) {
             impSD = (double*)calloc(p_size, sizeof(double));
         } else {
             impSD = (double*)calloc(1, sizeof(double));
             impSD[0]=0;
         }
         
+        // Should an n by ntree matrix be returned that keeps track of which samples are 'in-bag' in which trees (but not how many times, if sampling with replacement)
         int keepf[2];
         keepf[0] = 1;
-        keepf[1] = 0;// keep samples in bag
-        
+        keepf[1] = config.keep_inbag;
         int nt;
         if (keepf[0] == 1){
             nt = ntree;
@@ -134,120 +224,126 @@ public:
             nt = 1;
         }
         
-        double prox[]= {0};//[n_size*n_size]
+        // create ouput proximity matrix
+        if (!config.proximity) {
+            prox = (double*)calloc(1, sizeof(double));
+            prox[0] = 0;
+        } else {
+            prox = (double*)calloc(n_size * n_size, sizeof(double));
+        }
         
         //int ndtree[ntree];
-        int *ndtree; ndtree = (int*)calloc(ntree, sizeof(int));
+        ndtree = (int*)calloc(ntree, sizeof(int));
         
         //int nodestatus[nrnodes * nt];
-        SMALL_INT *nodestatus; nodestatus = (SMALL_INT*)calloc(nrnodes*nt, sizeof(SMALL_INT));
+        nodestatus = (small_int*)calloc(nrnodes*nt, sizeof(small_int));
         
         //int lDaughter[nrnodes * nt];
-        int *lDaughter; lDaughter = (int*)calloc(nrnodes*nt, sizeof(int));
+        lDaughter = (int*)calloc(nrnodes*nt, sizeof(int));
         
         //int rDaughter[nrnodes * nt];
-        int *rDaughter; rDaughter = (int*)calloc(nrnodes*nt, sizeof(int));
+        rDaughter = (int*)calloc(nrnodes*nt, sizeof(int));
         
         //double avnode[nrnodes * nt];
-        double *avnode; avnode = (double*) calloc(nrnodes*nt, sizeof(double));
+        avnode = (double*) calloc(nrnodes*nt, sizeof(double));
         
         //int mbest[nrnodes * nt];
-        int* mbest; mbest=(int*)calloc(nrnodes*nt, sizeof(int));
+        mbest=(int*)calloc(nrnodes*nt, sizeof(int));
         
         //double upper[nrnodes * nt];
-        double *upper; upper = (double*) calloc(nrnodes*nt, sizeof(double));
-        
-        double *mse = (double*)calloc(ntree, sizeof(double));
+        upper = (double*) calloc(nrnodes*nt, sizeof(double));
+        // vector of mean square errors: sum of squared residuals divided by n.
+        mse = (double*)calloc(ntree, sizeof(double));
         
         // copy data
-        double X[n_size * p_size], Y[n_size];
+        //        double X[n_size * p_size], Y[n_size];
+        double Y[n_size];
+        
+        // allocate on heap
+        double *X = (double *) calloc(n_size * p_size, sizeof(double));
+        
         int dimx[2];
         dimx[0] = n_size;
         dimx[1] = p_size;
         
         for (int i = 0; i < n_size; i++) {
             for (int j = 0; j < p_size; j++){
-                X[i * p_size + j] = input_X[i][j];
+                if (ncat[j] == 1) {
+                    // just ordinary numeric feature
+                    double fval = input_X[i][j];
+                    X[i * p_size + j] = fval;
+                } else {
+                    // store mapped value
+                    int val = input_X[i][j];
+                    for (int k = 0; k < ARRAY_SIZE(orig_uniques_in_feature[j]); k++) {
+                        if (val == orig_uniques_in_feature[j][k]) {
+                            val = k;
+                            break;
+                        }
+                    }
+                    X[i * p_size + j] = val;
+                }
             }
             Y[i] = input_Y[i];
         }
         
         int replace = config.replace;
-        int testdat = 0;
+        int testdat = config.testdat;
+        int nts = config.nts;
+        
         double *xts = X;
-        int nts = 10;
         double *yts = Y;
-        int labelts = 1;
+        int labelts = config.labelts;
         
         //double yTestPred[nts];
         double *yTestPred; yTestPred = (double*)calloc(nts, sizeof(double));
-        double proxts[]={1};
+        double proxts[] = {1};
         
         double *msets;
-        if (labelts==1){
-            msets=(double*)calloc(ntree, sizeof(double));
-        }else{
-            msets=(double*)calloc(ntree, sizeof(double));
-            msets[0]=1;
+        if (labelts == 1) {
+            msets = (double*)calloc(ntree, sizeof(double));
+        } else {
+            msets = (double*)calloc(ntree, sizeof(double));
+            msets[0] = 1;
         }
-        double coef[2];
+        
+        coef = (double*)calloc(2, sizeof(double));
         
         //int nout[n_size];
-        int*nout; nout=(int*)calloc(n_size, sizeof(int));
+        nout = (int*)calloc(n_size, sizeof(int));
         
-        int* inbag;
-        if (keepf[1]==1){
-            inbag=(int*)calloc(n_size * ntree, sizeof(int));
-        }else{
-            inbag=(int*)calloc(1, sizeof(int));
-            inbag[0]=1;
+        if (keepf[1] == 1) {
+            inbag = (int*)calloc(n_size * ntree, sizeof(int));
+        } else {
+            inbag = (int*)calloc(1, sizeof(int));
+            inbag[0] = 1;
         }
         
-        //below call just prints individual values
-        /*print_regRF_params( dimx, &sampsize,
-         &nodesize, &nrnodes, &ntree, &nvar,
-         imp, cat, config.maxcat, &jprint,
-         config.doProx, config.oobprox, config.biasCorr, y_pred_trn,
-         impout, impmat,impSD, prox,
-         ndtree, nodestatus, lDaughter, rDaughter,
-         avnode, mbest,upper, mse,
-         keepf, &replace, testdat, xts,
-         &nts, yts, labelts, yTestPred,
-         proxts, msets, coef,nout,
-         inbag);*/
-        
-        int jprint = config.jprint;
+        int jprint = config.do_trace;
+        bool print_verbose_tree_progression = false;
         
         //train the RF
         regRF(X, Y, dimx, &sampsize,
-              &nodesize, &nrnodes, &ntree, &nvar,
-              imp, cat, config.maxcat, &jprint,
-              config.doProx, config.oobprox, config.biasCorr, y_pred_trn,
+              &nodesize, &nrnodes, &ntree, &mtry,
+              imp, ncat, maxcat, &jprint,
+              config.proximity, config.oob_prox, config.corr_bias, y_pred_trn,
               impout, impmat, impSD, prox,
               ndtree, nodestatus, lDaughter, rDaughter,
               avnode, mbest, upper, mse,
               keepf, &replace, testdat, xts,
               &nts, yts, labelts, yTestPred,
               proxts, msets, coef, nout,
-              inbag, 0) ;
+              inbag, print_verbose_tree_progression) ;
         
-        //below call just prints individual values
-        /*print_regRF_params( dimx, &sampsize,
-         &nodesize, &nrnodes, &ntree, &nvar,
-         imp, cat, config.maxcat, &jprint,
-         config.doProx, config.oobprox, config.biasCorr, y_pred_trn,
-         impout, impmat,impSD, prox,
-         ndtree, nodestatus, lDaughter, rDaughter,
-         avnode, mbest,upper, mse,
-         keepf, &replace, testdat, xts,
-         &nts, yts, labelts, yTestPred,
-         proxts, msets, coef,nout,
-         inbag);*/
-        
-        //
-        // Prediction
-        //
-        n_size = (int)test_X.size();
+        // let the train variables go free
+        free(yTestPred);
+        free(msets);
+        free(X);
+    }
+    
+    VD predict(const VVD &test_X, const RF_config &config) {
+        int n_size = (int)test_X.size(); // rows
+        int p_size = (int)test_X[0].size(); // cols
         double* ypred = (double*)calloc(n_size, sizeof(double));
         int mdim = p_size;
         
@@ -256,45 +352,68 @@ public:
         int* treeSize = ndtree;
         int keepPred = 0;
         double allPred = 0;
-        double proxMat = 0;
         int nodes = 0;
         int *nodex; nodex = (int*)calloc(n_size, sizeof(int));
+        
+        double* proxMat;
+        if (!config.proximity) {
+            proxMat = (double*)calloc(1, sizeof(double));
+            proxMat[0] = 0;
+        } else {
+            proxMat = (double*)calloc(n_size * n_size, sizeof(double));
+        }
         
         double X_test[n_size * p_size];
         for (int i = 0; i < n_size; i++) {
             for (int j = 0; j < p_size; j++){
-                X_test[i * p_size + j] = test_X[i][j];
+                if (ncat[j] == 1) {
+                    // just ordinary numeric feature
+                    X_test[i * p_size + j] = test_X[i][j];
+                } else {
+                    // store mapped value
+                    int val = test_X[i][j];
+                    for (int k = 0; k < ARRAY_SIZE(orig_uniques_in_feature[j]); k++) {
+                        if (val == orig_uniques_in_feature[j][k]) {
+                            val = k;
+                            break;
+                        }
+                    }
+                    X_test[i * p_size + j] = val;
+                }
             }
         }
         
         regForest(X_test, ypred, &mdim, &n_size,
                   &ntree, lDaughter, rDaughter,
                   nodestatus, &nrnodes, xsplit,
-                  avnodes, mbest, treeSize, cat,
-                  config.maxcat, &keepPred, &allPred, config.doProx,
-                  &proxMat, &nodes, nodex);
+                  avnodes, mbest, treeSize, ncat,
+                  maxcat, &keepPred, &allPred, config.proximity,
+                  proxMat, &nodes, nodex);
         
         VD res(n_size, 0);
         for (int i = 0;i < n_size;i++) {
-            Printf("%g\n", ypred[i]);
             res[i] = ypred[i];
         }
         
-        //let the variables go free
-        free(cat);
+        free(ypred);
+        free(nodex);
+        free(proxMat);
+        
+        return res;
+    }
+    
+    /**
+     * Invoked to clear stored model state
+     */
+    void release() {
+        // let the model variables go free
+        free(nout);
+        free(inbag);
         free(y_pred_trn);
         free(impout);
         free(impmat);
         free(impSD);
         free(mse);
-        free(yTestPred);
-        free(msets);
-        free(nout);
-        free(inbag);
-        
-        //few of the below needs to be saved if prediction has to be done in a separate file
-        free(ypred);
-        free(nodex);
         free(ndtree);
         free(nodestatus);
         free(lDaughter);
@@ -302,36 +421,48 @@ public:
         free(upper);
         free(avnode);
         free(mbest);
+        free(ncat);
         
-        return res;
+        if (orig_uniques_in_feature) {
+            int N = ARRAY_SIZE(orig_uniques_in_feature);
+            for(int i = 0; i < N; i++) {
+                free(orig_uniques_in_feature[i]);
+            }
+            free(orig_uniques_in_feature);
+        }
     }
     
 private:
-
-    /*************************************************************************
-     * Input:
-     * mdim=number of variables in data set
-     * nsample=number of cases
-     *
-     * nthsize=number of cases in a node below which the tree will not split,
-     * setting nthsize=5 generally gives good results.
-     *
-     * nTree=number of trees in run.  200-500 gives pretty good results
-     *
-     * mtry=number of variables to pick to split on at each node.  mdim/3
-     * seems to give genrally good performance, but it can be
-     * altered up or down
-     *
-     * imp=1 turns on variable importance.  This is computed for the
-     * mth variable as the percent rise in the test set mean sum-of-
-     * squared errors when the mth variable is randomly permuted.
-     *
-     *************************************************************************/
+    
+    inline int findSortedUniqueFeaturesAndMap(const VVD input_x, const int fIndex, int *features) const {
+        size_t rows = input_x.size();
+        VD fTmp(rows, 0);
+        for (int i = 0; i < rows; i++) {
+            fTmp[i] = input_x[i][fIndex];
+        }
+        sort(fTmp.begin(), fTmp.end());
+        VD unique;
+        int previous = numeric_limits<int>::min();
+        for (int i = 0; i < rows; i++) {
+            if (fTmp[i] != previous) {
+                previous = fTmp[i];
+                unique.push_back(fTmp[i]);
+            }
+        }
+        int catNum = (int)unique.size();
+        features = (int *)malloc(catNum * sizeof(int));
+        
+        for (int i = 0; i < catNum; i++) {
+            features[i] = (int)unique[i];
+        }
+        return catNum;
+    }
+    
     void regRF(double *x, double *y, int *xdim, int *sampsize,
                int *nthsize, int *nrnodes, int *nTree, int *mtry, int *imp,
                int *cat, int maxcat, int *jprint, int doProx, int oobprox,
                int biasCorr, double *yptr, double *errimp, double *impmat,
-               double *impSD, double *prox, int *treeSize, SMALL_INT *nodestatus,
+               double *impSD, double *prox, int *treeSize, small_int *nodestatus,
                int *lDaughter, int *rDaughter, double *avnode, int *mbest,
                double *upper, double *mse, const int *keepf, int *replace,
                int testdat, double *xts, int *nts, double *yts, int labelts,
@@ -344,8 +475,7 @@ private:
         
         double *yb, *xtmp, *xb, *ytr, *ytree, *tgini;
         
-        int k, m, mr, n, nOOB, j, jout, idx, ntest, last, ktmp, nPerm,
-        nsample, mdim, keepF, keepInbag;
+        int k, m, mr, n, nOOB, j, jout, idx, ntest, last, ktmp, nPerm, nsample, mdim, keepF, keepInbag;
         int *oobpair, varImp, localImp, *varUsed;
         
         int *in, *nind, *nodex, *nodexts;
@@ -353,7 +483,7 @@ private:
         //Abhi:temp variable
         double tmp_d;
         int tmp_i;
-        SMALL_INT tmp_c;
+        small_int tmp_c;
         
         //Do initialization for COKUS's Random generator
         rnd.seedMT(2*rand()+1);  //works well with odd number so why don't use that
@@ -379,10 +509,6 @@ private:
         varUsed    = (int *) calloc(mdim, sizeof(int));
         nind = *replace ? NULL : (int *) calloc(nsample, sizeof(int));
         
-        if (testdat) {
-            ytree      = (double *) calloc(ntest, sizeof(double));
-            nodexts    = (int *) calloc(ntest, sizeof(int));
-        }
         oobpair = (doProx && oobprox) ?
         (int *) calloc(nsample * nsample, sizeof(int)) : NULL;
         
@@ -397,7 +523,7 @@ private:
         zeroDouble(yptr, nsample);
         zeroInt(nout, nsample);
         for (n = 0; n < nsample; ++n) {
-            varY += n * (y[n] - meanY)*(y[n] - meanY) / (n + 1);
+            varY += n * (y[n] - meanY) * (y[n] - meanY) / (n + 1);
             meanY = (n * meanY + y[n]) / (n + 1);
         }
         varY /= nsample;
@@ -405,8 +531,8 @@ private:
         varYts = 0.0;
         meanYts = 0.0;
         if (testdat) {
-            for (n = 0; n < ntest; ++n) {
-                varYts += n * (yts[n] - meanYts)*(yts[n] - meanYts) / (n + 1);
+            for (n = 0; n <= ntest; ++n) {
+                varYts += n * (yts[n] - meanYts) * (yts[n] - meanYts) / (n + 1);
                 meanYts = (n * meanYts + yts[n]) / (n + 1);
             }
             varYts /= ntest;
@@ -439,6 +565,10 @@ private:
          *************************************/
         
         time_t curr_time;
+        if (testdat) {
+            ytree = (double *) calloc(ntest, sizeof(double));
+            nodexts = (int *) calloc(ntest, sizeof(int));
+        }
         
         for (j = 0; j < *nTree; ++j) {
             
@@ -526,9 +656,7 @@ private:
                 /* compute testset MSE */
                 if (labelts) {
                     for (n = 0; n < ntest; ++n) {
-                        resid = biasCorr ?
-                        yts[n] - (coef[0] + coef[1]*yTestPred[n]) :
-                        yts[n] - yTestPred[n];
+                        resid = biasCorr ? yts[n] - (coef[0] + coef[1] * yTestPred[n]) : yts[n] - yTestPred[n];
                         errts += resid * resid;
                     }
                     errts /= ntest;
@@ -539,8 +667,8 @@ private:
             if ((j + 1) % *jprint == 0) {
                 Printf("%4d |", j + 1);
                 Printf(" %8.4g %8.2f ", errb, 100 * errb / varY);
-                if(labelts == 1) Printf("| %8.4g %8.2f ",
-                                        errts, 100.0 * errts / varYts);
+                if(labelts == 1)
+                    Printf("| %8.4g %8.2f ", errts, 100.0 * errts / varYts);
                 Printf("|\n");
             }
             
@@ -583,8 +711,7 @@ private:
                                     r = ytr[n] - y[n];
                                     ooberrperm += r * r;
                                     if (localImp) {
-                                        impmat[mr + n * mdim] +=
-                                        (r*r - resOOB[n]*resOOB[n]) / nPerm;
+                                        impmat[mr + n * mdim] += (r * r - resOOB[n] * resOOB[n]) / nPerm;
                                     }
                                 }
                             }
@@ -645,10 +772,6 @@ private:
         }
         for (m = 0; m < mdim; ++m) tgini[m] /= *nTree;
         
-        
-        //addition by abhi
-        //in order to release the space stored by the variable in findBestSplit
-        // call by setting
         in_findBestSplit=-99;
         findBestSplit(&tmp_d, &tmp_i, &tmp_d, tmp_i, tmp_i,
                       tmp_i, tmp_i, &tmp_i, &tmp_d,
@@ -687,7 +810,7 @@ private:
     /*----------------------------------------------------------------------*/
     void regForest(double *x, double *ypred, int *mdim, int *n,
                    int *ntree, int *lDaughter, int *rDaughter,
-                   SMALL_INT *nodestatus, int *nrnodes, double *xsplit,
+                   small_int *nodestatus, int *nrnodes, double *xsplit,
                    double *avnodes, int *mbest, int *treeSize, int *cat,
                    int maxcat, int *keepPred, double *allpred, int doProx,
                    double *proxMat, int *nodes, int *nodex) {
@@ -780,7 +903,7 @@ private:
     
     void regTree(double *x, double *y, int mdim, int nsample, int *lDaughter,
                  int *rDaughter,
-                 double *upper, double *avnode, SMALL_INT *nodestatus, int nrnodes,
+                 double *upper, double *avnode, small_int *nodestatus, int nrnodes,
                  int *treeSize, int nthsize, int mtry, int *mbest, int *cat,
                  double *tgini, int *varUsed) {
         int i, j, k, m, ncur;
@@ -1076,7 +1199,7 @@ private:
     }
     /*====================================================================*/
     void predictRegTree(double *x, int nsample, int mdim,
-                        int *lDaughter, int *rDaughter, SMALL_INT *nodestatus,
+                        int *lDaughter, int *rDaughter, small_int *nodestatus,
                         double *ypred, double *split, double *nodepred,
                         int *splitVar, int treeSize, int *cat, int maxcat,
                         int *nodex) {
@@ -1119,7 +1242,7 @@ private:
     }
     
     void zeroSMALLInt(void *x, int length) {
-        memset(x, 0, length * sizeof(SMALL_INT));
+        memset(x, 0, length * sizeof(small_int));
     }
     void zeroInt(int *x, int length) {
         memset(x, 0, length * sizeof(int));
@@ -1227,7 +1350,7 @@ private:
                             int *nthsize, int *nrnodes, int *nTree, int *mtry, int *imp,
                             int *cat, int maxcat, int *jprint, int doProx, int oobprox,
                             int biasCorr, double *yptr, double *errimp, double *impmat,
-                            double *impSD, double *prox, int *treeSize, SMALL_INT *nodestatus,
+                            double *impSD, double *prox, int *treeSize, small_int *nodestatus,
                             int *lDaughter, int *rDaughter, double *avnode, int *mbest,
                             double *upper, double *mse, int *keepf, int *replace,
                             int testdat, double *xts, int *nts, double *yts, int labelts,
@@ -1235,13 +1358,12 @@ private:
                             int *nout, int *inbag)  {
         Printf("n_size %d p_size %d\n", xdim[0], xdim[1]);
         Printf("sampsize %d, nodesize %d nrnodes %d\n", *sampsize, *nthsize, *nrnodes);
-        Printf("ntree %d, mtry/nvar %d, impor %d, localimp %d, nPerm %d\n", *nTree, *mtry, imp[0], imp[1], imp[2]);
+        Printf("ntree %d, mtry %d, impor %d, localimp %d, nPerm %d\n", *nTree, *mtry, imp[0], imp[1], imp[2]);
         Printf("maxcat %d, jprint %d, doProx %d, oobProx %d, biasCorr %d\n", maxcat, *jprint, doProx, oobprox, biasCorr);
         Printf("prox %f, keep.forest %d, keep.inbag %d\n", *prox, keepf[0], keepf[1]);
         Printf("replace %d, labelts %d, proxts %f\n", *replace, labelts, *proxts);
     }
 };
-
 
 
 #endif
