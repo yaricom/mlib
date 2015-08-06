@@ -6,6 +6,8 @@
 //  Copyright (c) 2015 yaric. All rights reserved.
 //
 #include "unit++/unit++.h"
+#include <sstream>
+#include <vector>
 
 #include "defines.h"
 #include "matrix.h"
@@ -18,6 +20,7 @@
 #include "estimators.h"
 #include "ridge_regression.h"
 #include "random.h"
+#include "node_serializer.h"
 
 using namespace nologin;
 using namespace nologin::math;
@@ -317,6 +320,113 @@ public:
         suite::main().add("Random", this);
     }
 };
+typedef enum _TerminalType {
+    AVERAGE, MAXIMAL
+}TerminalType;
+
+class RegressionTree {
+    // class members
+    int m_min_nodes;
+    int m_max_depth;
+    int m_current_depth;
+    TerminalType m_type;
+    
+    Node *m_root = NULL;
+public:
+    void save(ostream &os) {
+        
+    }
+    
+    void load(istream &is) {
+        
+    }
+};
+
+class PredictionForest {
+public:
+    // class members
+    double m_init_value;
+    // the tree forest
+    VC<RegressionTree> m_trees;
+    // the learning rate
+    double m_combine_weight;
+    
+ public:
+    void save(ostream &os) {
+        os << m_init_value;
+        os << " ";
+        os << m_combine_weight;
+        os << " ";
+        os << (int)m_trees.size();
+        os << " ";
+        for(RegressionTree &tree : m_trees) {
+            tree.save(os);
+        }
+    }
+    
+    void load(istream &is) {
+        double init_value;
+        is >> init_value;
+        is.get();
+        double combine_weight;
+        is >> combine_weight;
+        is.get();
+        int size;
+        is >> size;
+        is.get();
+        m_trees.resize(size);
+        for (int i = 0; i < size; i++) {
+            RegressionTree tree;
+            tree.load(is);
+        }
+    }
+};
+
+class TestModelSerialization : public unitpp::suite {
+    void checkNodeSerializationTest() {
+        Printf("The Node tree serialization test+++++++++++++++++++++++++++\n");
+        Node *n5 = new Node(.5, 5, .5, .5);
+        Node *n4 = new Node(.4, 4, .4, .4);
+        Node *n3 = new Node(.3, 3, .3, .3);
+        n3->m_left_child = n4;
+        n3->m_right_child = n5;
+        Node *n2 = new Node(.2, 2, .2, .2);
+        Node *n1 = new Node(.1, 1, .1, .1);
+        n1->m_left_child = n3;
+        n1->m_right_child = n2;
+        
+        ostringstream so;
+        serialize(n1, so);
+        
+        string output = so.str();
+        Printf("Serialized: %s\n", output.c_str());
+        
+        // deserialize
+        istringstream si(output);
+        Node *n_out = deserialize(si);
+        unitpp::assert_eq("Root Node value", n1->m_node_value, n_out->m_node_value);
+        unitpp::assert_true("Root Node left value", abs(n1->m_left_child->m_node_value - n_out->m_left_child->m_node_value) < 0.0001);
+        unitpp::assert_true("Root Node right value", abs(n1->m_right_child->m_node_value - n_out->m_right_child->m_node_value) < 0.0001);
+        
+        ostringstream os;
+        serialize(n_out, os);
+        Printf("Deserialized: %s\n", os.str().c_str());
+    }
+    
+    void checkModelSerializationTest() {
+        
+    }
+    
+    
+public:
+    TestModelSerialization() : suite("The Model Serialization Test Suite") {
+        add("checkNodeSerializationTest", unitpp::testcase(this, "The Node tree serialization test", &TestModelSerialization::checkNodeSerializationTest));
+        
+        // add this suite to the main suite
+        suite::main().add("The Model Serialization", this);
+    }
+};
 
 RandomTest *test = new RandomTest();
 TestMatrix* theTest = new TestMatrix();
+TestModelSerialization *modelTest = new TestModelSerialization();
