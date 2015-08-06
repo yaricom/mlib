@@ -99,6 +99,7 @@
 		787AFD051A813BCC00D345CA /* statistics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = statistics.h; sourceTree = "<group>"; };
 		78A8CDA11A7A9EC8000FACD3 /* gradient_boosting_tree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gradient_boosting_tree.h; sourceTree = "<group>"; };
 		78C45E141AA5EB4A00431637 /* RF_regression.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RF_regression.h; sourceTree = "<group>"; };
+		78C9D0EB1B7382C000924270 /* base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = base64.h; sourceTree = "<group>"; };
 		78EA4D721A704FE000A5096F /* MLib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MLib; sourceTree = BUILT_PRODUCTS_DIR; };
 		78EA4D751A704FE000A5096F /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		78EA4D7D1A70510A00A5096F /* matrix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = matrix.h; sourceTree = "<group>"; };
@@ -340,6 +341,7 @@
 				78269F421AA880BC0060E9F0 /* qsort_i.h */,
 				78EA4D851A70510A00A5096F /* utils.h */,
 				7860EEBB1A79271000505FED /* io.h */,
+				78C9D0EB1B7382C000924270 /* base64.h */,
 			);
 			path = utils;
 			sourceTree = "<group>";
