@@ -20,12 +20,12 @@
 #include "estimators.h"
 #include "ridge_regression.h"
 #include "random.h"
-#include "node_serializer.h"
 
 using namespace nologin;
 using namespace nologin::math;
 using namespace nologin::utils;
 using namespace nologin::preprocessing;
+using namespace nologin::tree;
 
 class TestMatrix : public unitpp::suite {
     
@@ -320,71 +320,102 @@ public:
         suite::main().add("Random", this);
     }
 };
-typedef enum _TerminalType {
-    AVERAGE, MAXIMAL
-}TerminalType;
 
-class RegressionTree {
-    // class members
-    int m_min_nodes;
-    int m_max_depth;
-    int m_current_depth;
-    TerminalType m_type;
-    
-    Node *m_root = NULL;
-public:
-    void save(ostream &os) {
-        
-    }
-    
-    void load(istream &is) {
-        
-    }
-};
-
-class PredictionForest {
-public:
-    // class members
-    double m_init_value;
-    // the tree forest
-    VC<RegressionTree> m_trees;
-    // the learning rate
-    double m_combine_weight;
-    
- public:
-    void save(ostream &os) {
-        os << m_init_value;
-        os << " ";
-        os << m_combine_weight;
-        os << " ";
-        os << (int)m_trees.size();
-        os << " ";
-        for(RegressionTree &tree : m_trees) {
-            tree.save(os);
-        }
-    }
-    
-    void load(istream &is) {
-        double init_value;
-        is >> init_value;
-        is.get();
-        double combine_weight;
-        is >> combine_weight;
-        is.get();
-        int size;
-        is >> size;
-        is.get();
-        m_trees.resize(size);
-        for (int i = 0; i < size; i++) {
-            RegressionTree tree;
-            tree.load(is);
-        }
-    }
-};
-
-class TestModelSerialization : public unitpp::suite {
+class TestGBTModelSerialization : public unitpp::suite {
     void checkNodeSerializationTest() {
         Printf("The Node tree serialization test+++++++++++++++++++++++++++\n");
+        Node *n1 = createNode();
+        
+        ostringstream so;
+        saveNode(n1, so);
+        
+        string output = so.str();
+        Printf("Serialized:\t\t%s\n", output.c_str());
+        
+        // deserialize
+        istringstream si(output);
+        Node *n_out = loadNode(si);
+        unitpp::assert_eq("Root Node value", n1->m_node_value, n_out->m_node_value);
+        unitpp::assert_true("Root Node left value", abs(n1->m_left_child->m_node_value - n_out->m_left_child->m_node_value) < 0.0001);
+        unitpp::assert_true("Root Node right value", abs(n1->m_right_child->m_node_value - n_out->m_right_child->m_node_value) < 0.0001);
+        
+        ostringstream os;
+        saveNode(n_out, os);
+        Printf("Deserialized:\t%s\n", os.str().c_str());
+        
+        delete n1;
+    }
+    
+    void checkSaveRegressionTree() {
+        Printf("The regression tree serialization test+++++++++++++++++++++++++++\n");
+        Node *root = createNode();
+        RegressionTree tree;
+        tree.m_root = root;
+        tree.m_current_depth = 11;
+        tree.m_max_depth = 20;
+        tree.m_min_nodes = 5;
+        
+        
+        // serialize
+        ostringstream so;
+        saveRegressionTree(tree, so);
+        string output = so.str();
+        Printf("Serialized:\t\t%s\n", output.c_str());
+        
+        // deserialize
+        istringstream si(output);
+        RegressionTree d_tree;
+        loadRegressionTree(d_tree, si);
+        unitpp::assert_eq("Tree depth", d_tree.m_current_depth, tree.m_current_depth);
+        unitpp::assert_eq("Tree max depth", d_tree.m_max_depth, tree.m_max_depth);
+        unitpp::assert_eq("Tree min nodes", d_tree.m_min_nodes, tree.m_min_nodes);
+        unitpp::assert_eq("Tree Root Node value", d_tree.m_root->m_node_value, tree.m_root->m_node_value);
+        
+        ostringstream os;
+        saveRegressionTree(d_tree, os);
+        Printf("Deserialized:\t%s\n", os.str().c_str());
+    }
+    
+    void checkGPFSerializationTest() {
+        Printf("The Gradient Prediction Forest serialization test+++++++++++++++++++++++++++\n");
+        Node *root = createNode();
+        RegressionTree tree;
+        tree.m_root = root;
+        tree.m_current_depth = 11;
+        tree.m_max_depth = 20;
+        tree.m_min_nodes = 5;
+        
+        PredictionForest forest(0.5);
+        forest.m_init_value = 10;
+        forest.m_trees = {tree};
+        
+        // serialize
+        ostringstream so;
+        savePredictionForest(forest, so);
+        string output = so.str();
+        Printf("Serialized:\t\t%s\n", output.c_str());
+        
+        // deserialize
+        istringstream si(output);
+        PredictionForest d_forest(0.01);
+        loadPredictionForest(d_forest, si);
+        unitpp::assert_eq("Init value", d_forest.m_init_value, forest.m_init_value);
+        unitpp::assert_eq("Learning rate", d_forest.m_combine_weight, forest.m_combine_weight);
+        unitpp::assert_eq("Trees count", d_forest.m_trees.size(), forest.m_trees.size());
+        
+        RegressionTree d_tree = d_forest.m_trees[0];
+        unitpp::assert_eq("Tree depth", d_tree.m_current_depth, tree.m_current_depth);
+        unitpp::assert_eq("Tree max depth", d_tree.m_max_depth, tree.m_max_depth);
+        unitpp::assert_eq("Tree min nodes", d_tree.m_min_nodes, tree.m_min_nodes);
+        unitpp::assert_eq("Tree Root Node value", d_tree.m_root->m_node_value, tree.m_root->m_node_value);
+        
+        ostringstream os;
+        savePredictionForest(d_forest, os);
+        Printf("Deserialized:\t%s\n", os.str().c_str());
+    }
+    
+    
+    Node *createNode() {
         Node *n5 = new Node(.5, 5, .5, .5);
         Node *n4 = new Node(.4, 4, .4, .4);
         Node *n3 = new Node(.3, 3, .3, .3);
@@ -394,33 +425,14 @@ class TestModelSerialization : public unitpp::suite {
         Node *n1 = new Node(.1, 1, .1, .1);
         n1->m_left_child = n3;
         n1->m_right_child = n2;
-        
-        ostringstream so;
-        serialize(n1, so);
-        
-        string output = so.str();
-        Printf("Serialized: %s\n", output.c_str());
-        
-        // deserialize
-        istringstream si(output);
-        Node *n_out = deserialize(si);
-        unitpp::assert_eq("Root Node value", n1->m_node_value, n_out->m_node_value);
-        unitpp::assert_true("Root Node left value", abs(n1->m_left_child->m_node_value - n_out->m_left_child->m_node_value) < 0.0001);
-        unitpp::assert_true("Root Node right value", abs(n1->m_right_child->m_node_value - n_out->m_right_child->m_node_value) < 0.0001);
-        
-        ostringstream os;
-        serialize(n_out, os);
-        Printf("Deserialized: %s\n", os.str().c_str());
+        return n1;
     }
-    
-    void checkModelSerializationTest() {
-        
-    }
-    
     
 public:
-    TestModelSerialization() : suite("The Model Serialization Test Suite") {
-        add("checkNodeSerializationTest", unitpp::testcase(this, "The Node tree serialization test", &TestModelSerialization::checkNodeSerializationTest));
+    TestGBTModelSerialization() : suite("The Gradient Boosting Tree Model Serialization Test Suite") {
+        add("checkNodeSerializationTest", unitpp::testcase(this, "The Node tree serialization test", &TestGBTModelSerialization::checkNodeSerializationTest));
+        add("checkSaveRegressionTree", unitpp::testcase(this, "The regression tree serialization test", &TestGBTModelSerialization::checkSaveRegressionTree));
+        add("checkGPFSerializationTest", unitpp::testcase(this, "The Gradient Prediction Forest serialization test", &TestGBTModelSerialization::checkGPFSerializationTest));
         
         // add this suite to the main suite
         suite::main().add("The Model Serialization", this);
@@ -429,4 +441,4 @@ public:
 
 RandomTest *test = new RandomTest();
 TestMatrix* theTest = new TestMatrix();
-TestModelSerialization *modelTest = new TestModelSerialization();
+TestGBTModelSerialization *modelTest = new TestGBTModelSerialization();

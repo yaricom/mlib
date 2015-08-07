@@ -82,18 +82,17 @@ namespace nologin {
         };
         
         typedef enum _TerminalType {
-            AVERAGE, MAXIMAL
+            AVERAGE = 0, MAXIMAL
         }TerminalType;
         
         class RegressionTree {
-        private:
+        public:
             // class members
             int m_min_nodes;
             int m_max_depth;
             int m_current_depth;
             TerminalType m_type;
-            
-        public:
+
             // The root node
             Node *m_root = NULL;
             // The features importance per index
@@ -702,6 +701,118 @@ namespace nologin {
                 return res_fun;
             }
         };
+        
+        //
+        // The model serialization
+        //
+        
+        void saveNode(const Node *node, ostream &os) {
+            if (node == NULL) {
+                os << ".";
+                return;
+            }
+            // store node values
+            os << node->m_node_value;
+            os << "|";
+            os << node->m_feature_index;
+            os << "|";
+            os << node->m_terminal_left;
+            os << "|";
+            os << node->m_terminal_right;
+            os << "|";
+            
+            // proceed with childs
+            saveNode(node->m_left_child, os);
+            saveNode(node->m_right_child, os);
+        }
+        
+        Node *loadNode(istream &is) {
+            char c = is.get();
+            if (c == '.') {
+                return NULL;
+            }
+            // return charcter back
+            is.unget();
+            // read next node
+            double node_value;
+            is >> node_value;
+            is.get();
+            int feature_index;
+            is >> feature_index;
+            is.get();
+            double terminal_left;
+            is >> terminal_left;
+            is.get();
+            double terminal_right;
+            is >> terminal_right;
+            is.get();
+            Node *node = new Node(node_value, feature_index, terminal_left, terminal_right);
+            
+            // proceed with childs
+            node->m_left_child = loadNode(is);
+            node->m_right_child = loadNode(is);
+            
+            return node;
+        }
+        
+        void saveRegressionTree(RegressionTree &tree, ostream &os) {
+            os << tree.m_min_nodes;
+            os << "|";
+            os << tree.m_max_depth;
+            os << "|";
+            os << tree.m_current_depth;
+            os << "|";
+            os << tree.m_type;
+            os << "|";
+            // The root node
+            if (tree.m_root) {
+                saveNode(tree.m_root, os);
+            }
+        }
+        
+        void loadRegressionTree(RegressionTree &tree, istream &is) {
+            is >> tree.m_min_nodes;
+            is.get();
+            is >> tree.m_max_depth;
+            is.get();
+            is >> tree.m_current_depth;
+            is.get();
+            int type;
+            is >> type;
+            tree.m_type = (type == 0 ? AVERAGE : MAXIMAL);
+            is.get();
+            
+            // the root node
+            tree.m_root = loadNode(is);
+        }
+        
+        void savePredictionForest(PredictionForest &forest, ostream &os) {
+            os << forest.m_init_value;
+            os << "|";
+            os << forest.m_combine_weight;
+            os << "|";
+            os << (int)forest.m_trees.size();
+            os << "|";
+            for(RegressionTree &tree : forest.m_trees) {
+                saveRegressionTree(tree, os);
+            }
+        }
+        
+        void loadPredictionForest(PredictionForest &forest, istream &is) {
+            is >> forest.m_init_value;
+            is.get();
+            is >> forest.m_combine_weight;
+            is.get();
+            int size;
+            is >> size;
+            is.get();
+            forest.m_trees.resize(size);
+            for (int i = 0; i < size; i++) {
+                RegressionTree tree;
+                loadRegressionTree(tree, is);
+                forest.m_trees[i] = tree;
+            }
+        }
     }
 }
 #endif
