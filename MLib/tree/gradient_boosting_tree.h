@@ -332,7 +332,7 @@ namespace nologin {
                     split_res.m_right_value = mean_value;
                     
                 } else if (m_type == MAXIMAL) {
-                    double max_value = 0.0;
+                    double max_value = numeric_limits<double>::min();
                     VD::iterator iter = split_res.m_obs_left.begin();
                     if (++iter != split_res.m_obs_left.end()) {
                         max_value = *iter;
@@ -349,7 +349,7 @@ namespace nologin {
                     
                     
                     // right value
-                    max_value = 0.0;
+                    max_value = numeric_limits<double>::min();
                     iter = split_res.m_obs_right.begin();
                     if (++iter != split_res.m_obs_right.end()) {
                         max_value = *iter;
@@ -426,6 +426,11 @@ namespace nologin {
             // the learning rate
             double m_combine_weight;
             
+            // the hypothesis values during train per observation
+            // may be used to find error value per observation as following
+            // error(i) = observation_y(i) - hypothesis(i)
+            VD hypothesis;
+            
             // construction function
             PredictionForest(double learning_rate) : m_init_value(0.0), m_combine_weight(learning_rate) {}
             
@@ -458,6 +463,16 @@ namespace nologin {
                     concatenate(importances, m_trees[i].features_importance);
                 }
                 return importances;
+            }
+            
+            VD errPerObservation(const VD &input_y) {
+                Assert(hypothesis.size() == input_y.size(), "Provided samples count expected to be %lu, but was %lu", hypothesis.size(), input_y.size());
+                VD cost(input_y.size());
+                
+                for (int i = 0; i < input_y.size(); i++) {
+                    cost[i] = input_y[i] - hypothesis[i];
+                }
+                return cost;
             }
         };
         
@@ -501,10 +516,6 @@ namespace nologin {
                 Assert(samples_num == input_x.size() && samples_num > 0,
                        "Error: The input_x size should not be zero and should match the size of input_y");
                 
-                // holds indices of training data samples used for trees training
-                // this will be used later for OOB error calculation
-                VI used_indices(samples_num, -1);
-                
                 // get an initial guess of the function
                 double mean_y = 0.0;
                 for (double d : input_y) {
@@ -528,10 +539,10 @@ namespace nologin {
                 while (iter_index < m_tree_number) {
                     
                     // calculate the gradient
-                    VD gradient;
+                    VD error_y;
                     index = 0;
                     for (double d : input_y) {
-                        gradient.push_back(d - h_value[index]);
+                        error_y.push_back(d - h_value[index]);
                         
                         // next
                         index++;
@@ -553,11 +564,8 @@ namespace nologin {
                         
                         for (int sel_index : sampled_index) {
                             // assign value
-                            train_y.push_back(gradient[sel_index]);
+                            train_y.push_back(error_y[sel_index]);
                             train_x.push_back(input_x[sel_index]);
-                            
-                            // mark index as used
-                            used_indices[sel_index] = 1;
                         }
                         
                         // fit a regression tree
@@ -584,15 +592,11 @@ namespace nologin {
                         res_fun->m_trees.push_back(tree);
                         
                         // update h_value information, prepare for the next iteration
-                        int sel_index = 0;
-                        while (sel_index < samples_num) {
-                            h_value[sel_index] += m_learning_rate * tree.predict(input_x[sel_index]);
-                            sel_index++;
+                        for( int loop_index = 0; loop_index < samples_num; loop_index++) {
+                            h_value[loop_index] += m_learning_rate * tree.predict(input_x[loop_index]);
                         }
-                        
                     } else {
-                        // use all data
-                        // fit a regression tree
+                        // use all data to fit a regression tree
                         RegressionTree tree;
                         
                         // set parameters if needed
@@ -604,7 +608,7 @@ namespace nologin {
                             tree.setMinNodes(m_tree_min_nodes);
                         }
                         
-                        tree.buildRegressionTree(input_x, gradient);
+                        tree.buildRegressionTree(input_x, error_y);
                         
                         if (tree.m_root == NULL) {
                             // cannot update any more
@@ -622,6 +626,8 @@ namespace nologin {
                     // next iteration
                     iter_index++;
                 }
+                // store hypothesis for debugging
+                res_fun->hypothesis = h_value;
                 
                 return res_fun;
             }
