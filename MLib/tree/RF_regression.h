@@ -1144,8 +1144,7 @@ private:
                 npopl++;
                 npopr--;
                 if (v[j] < v[j+1]) {
-                    crit = (suml * suml / npopl) + (sumr * sumr / npopr) -
-                    critParent;
+                    crit = (suml * suml / npopl) + (sumr * sumr / npopr) - critParent;
                     if (crit > critvar) {
                         ubestt = (v[j] + v[j+1]) / 2.0;
                         critvar = crit;
