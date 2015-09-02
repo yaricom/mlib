@@ -32,6 +32,8 @@ namespace nologin {
             double m_terminal_left;
             double m_terminal_right;
             
+            double m_cost_function_value;
+            
             // Each non-leaf node has a left child and a right child.
             Node *m_left_child = NULL;
             Node *m_right_child = NULL;
@@ -53,6 +55,9 @@ namespace nologin {
             double m_node_value;
             // if false - split failed
             bool m_status;
+            
+            // the cost function value
+            double m_cost_function_value;
             
             // construction function
             BestSplit() : m_feature_index(0.0), m_node_value(0.0), m_status(false) {}
@@ -285,6 +290,7 @@ namespace nologin {
                 split_point.m_feature_index = split_index;
                 split_point.m_node_value = node_value;
                 split_point.m_status = true;
+                split_point.m_cost_function_value = min_err;
                 
                 return split_point;
             }
@@ -398,6 +404,7 @@ namespace nologin {
                 
                 // append current value to tree
                 Node *new_node = new Node(best_split.m_node_value, best_split.m_feature_index, split_data.m_left_value, split_data.m_right_value);
+                new_node->m_cost_function_value = best_split.m_cost_function_value;
                 
                 if (!m_root) {
                     m_root = new_node;
