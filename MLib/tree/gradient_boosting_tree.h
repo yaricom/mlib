@@ -539,10 +539,10 @@ namespace nologin {
                 while (iter_index < m_tree_number) {
                     
                     // calculate the gradient
-                    VD error_y;
+                    VD residuals;
                     index = 0;
                     for (double d : input_y) {
-                        error_y.push_back(d - h_value[index]);
+                        residuals.push_back(d - h_value[index]);
                         
                         // next
                         index++;
@@ -564,7 +564,7 @@ namespace nologin {
                         
                         for (int sel_index : sampled_index) {
                             // assign value
-                            train_y.push_back(error_y[sel_index]);
+                            train_y.push_back(residuals[sel_index]);
                             train_x.push_back(input_x[sel_index]);
                         }
                         
@@ -608,7 +608,7 @@ namespace nologin {
                             tree.setMinNodes(m_tree_min_nodes);
                         }
                         
-                        tree.buildRegressionTree(input_x, error_y);
+                        tree.buildRegressionTree(input_x, residuals);
                         
                         if (tree.m_root == NULL) {
                             // cannot update any more
