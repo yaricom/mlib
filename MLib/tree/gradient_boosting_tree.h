@@ -24,6 +24,8 @@ namespace nologin {
             int tree_number = 130;
             int tree_min_nodes = 10;
             int tree_depth = 3;
+            // The flag to indicate whether to collect MSE per iteration
+            bool collectMSE = false;
         };
         
         struct Node {
@@ -32,7 +34,7 @@ namespace nologin {
             double m_terminal_left;
             double m_terminal_right;
             
-            double m_cost_function_value;
+            double m_split_min_error;
             
             // Each non-leaf node has a left child and a right child.
             Node *m_left_child = NULL;
@@ -56,8 +58,8 @@ namespace nologin {
             // if false - split failed
             bool m_status;
             
-            // the cost function value
-            double m_cost_function_value;
+            // the minimal error value for split
+            double m_min_error;
             
             // construction function
             BestSplit() : m_feature_index(0.0), m_node_value(0.0), m_status(false) {}
@@ -290,7 +292,7 @@ namespace nologin {
                 split_point.m_feature_index = split_index;
                 split_point.m_node_value = node_value;
                 split_point.m_status = true;
-                split_point.m_cost_function_value = min_err;
+                split_point.m_min_error = min_err;
                 
                 return split_point;
             }
@@ -404,7 +406,7 @@ namespace nologin {
                 
                 // append current value to tree
                 Node *new_node = new Node(best_split.m_node_value, best_split.m_feature_index, split_data.m_left_value, split_data.m_right_value);
-                new_node->m_cost_function_value = best_split.m_cost_function_value;
+                new_node->m_split_min_error = best_split.m_min_error;
                 
                 if (!m_root) {
                     m_root = new_node;
@@ -432,12 +434,7 @@ namespace nologin {
             VC<RegressionTree> m_trees;
             // the learning rate
             double m_combine_weight;
-            
-            // the hypothesis values during train per observation
-            // may be used to find error value per observation as following
-            // error(i) = observation_y(i) - hypothesis(i)
-            VD hypothesis;
-            
+
             // construction function
             PredictionForest(double learning_rate) : m_init_value(0.0), m_combine_weight(learning_rate) {}
             
@@ -471,16 +468,6 @@ namespace nologin {
                 }
                 return importances;
             }
-            
-            VD errPerObservation(const VD &input_y) {
-                Assert(hypothesis.size() == input_y.size(), "Provided samples count expected to be %lu, but was %lu", hypothesis.size(), input_y.size());
-                VD cost(input_y.size());
-                
-                for (int i = 0; i < input_y.size(); i++) {
-                    cost[i] = input_y[i] - hypothesis[i];
-                }
-                return cost;
-            }
         };
         
         
@@ -494,7 +481,16 @@ namespace nologin {
             int m_tree_min_nodes = 10;
             int m_tree_depth = 3;
             
+            // The flag to indicate whether to collect MSE per iteration
+            bool collectMSE = false;
+            // The mean squared error per iteration
+            VD mse;
+            
         public:
+            GradientBoostingMachine(GBTConfig config) : GradientBoostingMachine(config.sampling_size_ratio, config.learning_rate,
+                                                                                config.tree_number, config.tree_min_nodes, config.tree_depth) {
+                collectMSE = config.collectMSE;
+            }
             
             GradientBoostingMachine(double sample_size_ratio, double learning_rate,
                                     int tree_number, int tree_min_nodes, int tree_depth) :
@@ -535,28 +531,35 @@ namespace nologin {
                 // prepare the iteration
                 VD h_value(samples_num);
                 // initialize h_value
-                int index = 0;
-                while (index < samples_num) {
+                for (int index = 0; index < samples_num; index++) {
                     h_value[index] = mean_y;
-                    index += 1;
+                }
+                
+                if (collectMSE) {
+                    mse.resize(m_tree_number, 0);
                 }
                 
                 // begin the boosting process
+                VD residuals(samples_num, 0);
                 int iter_index = 0;
                 while (iter_index < m_tree_number) {
-                    
-                    // calculate the gradient
-                    VD residuals;
-                    index = 0;
-                    for (double d : input_y) {
-                        residuals.push_back(d - h_value[index]);
+                    // collect residuals from last iteration
+                    for (int loop_index = 0; loop_index < samples_num; loop_index++) {
+                        double resid_y = input_y[loop_index] - h_value[loop_index];
+                        residuals[loop_index] = resid_y;
                         
-                        // next
-                        index++;
+                        // collect MSE
+                        if (collectMSE) {
+                            mse[iter_index] += resid_y * resid_y;
+                        }
+                    }
+                    
+                    if (collectMSE) {
+                        mse[iter_index] /= samples_num;
                     }
                     
                     // begin to sample
-                    if (m_sampling_size_ratio < 0.99) {
+                    if (m_sampling_size_ratio < 1.0) {
                         // sample without replacement
                         
                         // we need to sample
@@ -629,12 +632,10 @@ namespace nologin {
                             h_value[loop_index] += m_learning_rate * tree.predict(input_x[loop_index]);
                         }
                     }
-                    
+
                     // next iteration
                     iter_index++;
                 }
-                // store hypothesis for debugging
-                res_fun->hypothesis = h_value;
                 
                 return res_fun;
             }
